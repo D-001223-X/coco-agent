@@ -19,5 +19,5 @@ COPY . .
 # Expose port (Railway will set $PORT)
 EXPOSE 8000
 
-# Run with the shell-form so $PORT is expanded at runtime
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run with explicit sh -c to ensure $PORT expansion
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
