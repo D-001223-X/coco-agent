@@ -3,14 +3,11 @@ import { Sidebar } from "./Sidebar";
 import { ChatArea } from "./ChatArea";
 import { useRequireAuth } from "../../hooks/useAuth";
 import { useSessionStore } from "../../store/sessionStore";
-import { useChatStore } from "../../store/chatStore";
 
 export default function ChatPage() {
   useRequireAuth();
 
   const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
-  const loadSessions = useSessionStore((state) => state.loadSessions);
-  const sessions = useSessionStore((state) => state.sessions);
 
   const handleNewSession = () => {
     setCurrentSession("");
