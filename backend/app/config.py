@@ -1,0 +1,87 @@
+"""Application configuration loaded from environment / .env file."""
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Strongly-typed settings with mandatory API credential validation."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # ── Database ────────────────────────────────────────────
+    database_url: str = "sqlite+aiosqlite:///./coco.db"
+
+    # ── JWT ─────────────────────────────────────────────────
+    secret_key: str = "your-secret-key-change-this-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
+    # ── API Keys (required) ─────────────────────────────────
+    dashscope_api_key: str = ""
+    workspace_id: str = ""
+
+    # ── Retrieval ───────────────────────────────────────────
+    top_k: int = 5
+    score_threshold: float = 0.3
+
+    # ── FAISS / chunks file paths ───────────────────────────
+    faiss_index_path: str = "./coco_faiss.index"
+    chunks_meta_path: str = "./coco_chunks.json"
+
+    # ── Model identifiers ───────────────────────────────────
+    deepseek_model: str = "deepseek-v3"
+    embedding_model: str = "text-embedding-v3"
+    rerank_model: str = "qwen3-rerank"
+
+    # ── Validators ──────────────────────────────────────────
+    @model_validator(mode="after")
+    def _check_required_keys(self) -> "Settings":
+        missing: list[str] = []
+        if not self.dashscope_api_key:
+            missing.append("DASHSCOPE_API_KEY")
+        if not self.workspace_id:
+            missing.append("WORKSPACE_ID")
+        if missing:
+            raise ValueError(
+                "Missing required environment variable(s): "
+                + ", ".join(missing)
+            )
+        return self
+
+    # ── Dynamic URL properties ──────────────────────────────
+    @property
+    def deepseek_base_url(self) -> str:
+        return (
+            f"https://{self.workspace_id}.cn-beijing.maas.aliyuncs.com"
+            "/compatible-mode/v1"
+        )
+
+    @property
+    def embedding_base_url(self) -> str:
+        return (
+            f"https://{self.workspace_id}.cn-beijing.maas.aliyuncs.com"
+            "/compatible-mode/v1"
+        )
+
+    @property
+    def rerank_base_url(self) -> str:
+        return (
+            f"https://{self.workspace_id}.cn-beijing.maas.aliyuncs.com"
+            "/compatible-api/v1"
+        )
+
+
+# Defer instantiation so that test fixtures can monkey-patch env vars
+# before import.  A factory is provided instead of a module-level singleton.
+def get_settings() -> Settings:
+    """Return a fresh Settings instance (re-reads .env each call)."""
+    return Settings()
+
+
+# Module-level singleton for normal application use.
+settings = get_settings()
