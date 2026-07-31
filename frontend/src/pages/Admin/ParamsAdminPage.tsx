@@ -24,7 +24,7 @@ const PARAM_META: Array<{
 }> = [
   { key: "faiss_top_k", label: "FAISS 检索数", desc: "向量检索候选数量", min: 5, max: 100, step: 1 },
   { key: "fts5_top_k", label: "FTS5 检索数", desc: "关键词检索候选数量", min: 5, max: 100, step: 1 },
-  { key: "threshold", label: "相似度阈值", desc: "低于此分数过滤", min: 0, max: 1, step: 0.05 },
+  { key: "threshold", label: "相似度阈值", desc: "低于此分数过滤", min: 0.001, max: 1, step: 0.01 },
   { key: "rrf_k", label: "RRF K 值", desc: "融合平滑常数", min: 10, max: 200, step: 5 },
   { key: "final_top_k", label: "最终返回数", desc: "LLM 输入候选数", min: 1, max: 10, step: 1 },
 ];
@@ -134,7 +134,7 @@ export default function ParamsAdminPage() {
                       </span>
                     </div>
                     <span className="text-sm font-mono font-bold text-coral">
-                      {meta.step < 1 ? value.toFixed(2) : value}
+                      {meta.step < 0.1 ? value.toFixed(3) : meta.step < 1 ? value.toFixed(2) : value}
                     </span>
                   </div>
                   <input

@@ -50,7 +50,9 @@ _REFUSE_REPLY = {
 # ── System prompts (admin-editable via markers) ───────────
 # MARKER: SUPPORT_PROMPT_START
 SUPPORT_SYSTEM_PROMPT = """\
-你是可可语伴产品客服助手。请基于以下知识内容，用中文回答用户的问题，回答需简洁、准确，控制在100字以内。在回答的最后，另起一行提供英文翻译。
+你是可可语伴产品客服助手。请基于以下知识内容，用中文回答用户的问题，回答需简洁、准确，控制在100字以内。
+
+如果检索到的知识片段与用户问题明显不相关（如分数低于阈值），即使存在片段，也应视为“未找到相关知识”，返回useful=false，拒绝回答。
 
 知识内容：
 {context}

@@ -44,6 +44,20 @@ export async function fetchKnowledgeStatus(): Promise<KnowledgeStatus> {
   return data.data;
 }
 
+export interface KnowledgeChunk {
+  chunk_id: string;
+  section: string;
+  content_preview: string;
+  content_full: string;
+}
+
+export async function fetchKnowledgeChunks(): Promise<KnowledgeChunk[]> {
+  const { data } = await client.get<
+    ApiResp<{ chunks: KnowledgeChunk[]; total: number }>
+  >("/admin/knowledge/chunks");
+  return data.data.chunks;
+}
+
 // ── Prompts ────────────────────────────────────────────
 export async function fetchPrompts(): Promise<PromptInfo[]> {
   const { data } = await client.get<ApiResp<{ prompts: PromptInfo[] }>>(

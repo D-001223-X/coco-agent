@@ -1,8 +1,92 @@
+import { useState } from "react";
 import type { TraceDetail, LogNode } from "../../types";
 
 interface TraceDrawerProps {
   trace: TraceDetail | null;
   onClose: () => void;
+}
+
+interface RetrievalHit {
+  chunk_id: string;
+  rrf_score?: number;
+  faiss_score?: number | null;
+  bm25_score?: number | null;
+  rerank_score?: number | null;
+  section?: string;
+  content_preview?: string;
+}
+
+function RetrievalNodeDetail({ node }: { node: LogNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const output = (node.output_data ?? {}) as {
+    count?: number;
+    results?: RetrievalHit[];
+    result_count?: number;
+  };
+  const hits: RetrievalHit[] =
+    node.node === "rerank"
+      ? (output.results ?? []).map((r) => ({
+          chunk_id: String(r.doc_index ?? "?"),
+          rerank_score: r.rerank_score,
+        }))
+      : output.results ?? [];
+
+  if (hits.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-input p-3 border border-gray-100">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between text-xs font-semibold text-gray-500"
+      >
+        <span>命中片段 ({hits.length})</span>
+        <span>{expanded ? "收起 ▲" : "展开 ▼"}</span>
+      </button>
+      {expanded && (
+        <ul className="mt-3 space-y-2">
+          {hits.map((hit, i) => (
+            <li key={i} className="border border-gray-100 rounded-lg p-2">
+              <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-600">
+                <span className="bg-coral/10 text-coral px-1.5 py-0.5 rounded font-mono">
+                  #{hit.chunk_id}
+                </span>
+                {hit.section && (
+                  <span className="text-gray-500 truncate max-w-[180px]">
+                    {hit.section}
+                  </span>
+                )}
+                {hit.rrf_score !== undefined && (
+                  <span className="bg-gray-100 px-1.5 py-0.5 rounded">
+                    RRF: {hit.rrf_score}
+                  </span>
+                )}
+                {hit.faiss_score !== undefined && hit.faiss_score !== null && (
+                  <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                    FAISS: {hit.faiss_score}
+                  </span>
+                )}
+                {hit.bm25_score !== undefined && hit.bm25_score !== null && (
+                  <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
+                    BM25: {hit.bm25_score}
+                  </span>
+                )}
+                {hit.rerank_score !== undefined && hit.rerank_score !== null && (
+                  <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded">
+                    RERANK: {hit.rerank_score}
+                  </span>
+                )}
+              </div>
+              {hit.content_preview && (
+                <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+                  {hit.content_preview}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function TraceDrawer({ trace, onClose }: TraceDrawerProps) {
@@ -53,6 +137,14 @@ export function TraceDrawer({ trace, onClose }: TraceDrawerProps) {
               <div className="text-sm text-gray-600 mb-2">
                 <span className="font-semibold">耗时:</span> {node.duration_ms} ms
               </div>
+
+              {/* 命中片段（retrieval / rerank 节点） */}
+              {(node.node === "retrieval" || node.node === "rerank") && (
+                <div className="mt-3">
+                  <RetrievalNodeDetail node={node} />
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-3 mt-3">
                 <div className="bg-white rounded-input p-3 border border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 mb-1">输入</p>

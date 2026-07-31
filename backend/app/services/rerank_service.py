@@ -87,7 +87,13 @@ class RerankService:
                     "document_count": len(documents),
                     "top_k": top_k,
                 },
-                output_data={"result_count": len(result_list)},
+                output_data={
+                    "result_count": len(result_list),
+                    "results": [
+                        {"doc_index": i, "rerank_score": round(score, 4)}
+                        for i, (_, score) in enumerate(result_list)
+                    ],
+                },
                 duration_ms=duration_ms,
                 service="qwen3-rerank",
                 status=status,

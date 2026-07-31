@@ -84,6 +84,27 @@ class KnowledgeService:
             "index_path": str(faiss_path),
         }
 
+    # ── Chunk details (from coco_chunks.json) ─────────────
+    def get_chunks(self) -> list[dict]:
+        """Return all chunks with previews (source: coco_chunks.json)."""
+        s = get_settings()
+        chunks_path = Path(s.chunks_meta_path).resolve()
+        if not chunks_path.exists():
+            return []
+        try:
+            data = json.loads(chunks_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        return [
+            {
+                "chunk_id": c.get("chunk_id", ""),
+                "section": c.get("section", ""),
+                "content_preview": c.get("content", "")[:100],
+                "content_full": c.get("content", ""),
+            }
+            for c in data
+        ]
+
     # ── Rebuild index ───────────────────────────────────────
     async def rebuild_index(self) -> dict:
         """Run build_index.main() in-process (async), returns summary."""

@@ -41,12 +41,14 @@ VECTOR_DIM = 256
 # ── Result dataclass ─────────────────────────────────────
 @dataclass
 class RetrievedChunk:
-    """A single retrieved chunk with RRF-fused score."""
+    """A single retrieved chunk with RRF-fused score and raw scores."""
 
     chunk_id: str
     content: str
     score: float
     section: str = ""
+    faiss_score: float | None = None
+    bm25_score: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -168,6 +170,17 @@ class RetrievalService:
         output_summary = {
             "count": len(results),
             "top_scores": [round(r.score, 4) for r in results[:5]],
+            "results": [
+                {
+                    "chunk_id": r.chunk_id,
+                    "rrf_score": round(r.score, 4),
+                    "faiss_score": round(r.faiss_score, 4) if r.faiss_score is not None else None,
+                    "bm25_score": round(r.bm25_score, 4) if r.bm25_score is not None else None,
+                    "section": r.section,
+                    "content_preview": r.content[:100],
+                }
+                for r in results
+            ],
         }
         try:
             log_node(
@@ -230,8 +243,10 @@ class RetrievalService:
                 content=content,
                 score=score,
                 section=section,
+                faiss_score=faiss_score,
+                bm25_score=bm25_score,
             )
-            for cid, content, score, section in filtered
+            for cid, content, score, section, faiss_score, bm25_score in filtered
         ]
 
     # ── FAISS vector search (thread pool) ──────────────────
@@ -334,25 +349,38 @@ class RetrievalService:
         self,
         faiss_results: list[tuple[str, str, float, str]],
         fts5_results: list[tuple[str, str, float, str]],
-    ) -> list[tuple[str, str, float, str]]:
+    ) -> list[tuple[str, str, float, str, float | None, float | None]]:
+        """RRF fusion; also tracks the raw faiss / bm25 score per chunk."""
         rrf_k = int(self._params["rrf_k"])
         scores: dict[str, float] = {}
         meta: dict[str, tuple[str, str]] = {}
+        raw_scores: dict[str, dict[str, float | None]] = {}
 
-        for rank, (cid, content, _, section) in enumerate(faiss_results):
+        for rank, (cid, content, score, section) in enumerate(faiss_results):
             rrf = 1.0 / (rrf_k + rank + 1)
             scores[cid] = scores.get(cid, 0.0) + rrf
             if cid not in meta:
                 meta[cid] = (content, section)
+            raw_scores.setdefault(cid, {"faiss": None, "bm25": None})
+            raw_scores[cid]["faiss"] = score
 
-        for rank, (cid, content, _, section) in enumerate(fts5_results):
+        for rank, (cid, content, score, section) in enumerate(fts5_results):
             rrf = 1.0 / (rrf_k + rank + 1)
             scores[cid] = scores.get(cid, 0.0) + rrf
             if cid not in meta:
                 meta[cid] = (content, section)
+            raw_scores.setdefault(cid, {"faiss": None, "bm25": None})
+            raw_scores[cid]["bm25"] = score
 
         fused = [
-            (cid, meta[cid][0], score, meta[cid][1])
+            (
+                cid,
+                meta[cid][0],
+                score,
+                meta[cid][1],
+                raw_scores.get(cid, {}).get("faiss"),
+                raw_scores.get(cid, {}).get("bm25"),
+            )
             for cid, score in scores.items()
         ]
         fused.sort(key=lambda x: x[2], reverse=True)

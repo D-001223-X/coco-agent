@@ -78,3 +78,15 @@ async def knowledge_index_status(
         return {"code": 0, "data": status, "msg": "success"}
     except Exception as exc:
         return {"code": 500, "data": None, "msg": str(exc)}
+
+
+@router.get("/chunks")
+async def knowledge_chunks(
+    _admin: Annotated[User, Depends(verify_admin)],
+):
+    """Return all knowledge chunks with previews (from coco_chunks.json)."""
+    try:
+        chunks = _service.get_chunks()
+        return {"code": 0, "data": {"chunks": chunks, "total": len(chunks)}, "msg": "success"}
+    except Exception as exc:
+        return {"code": 500, "data": None, "msg": str(exc)}
