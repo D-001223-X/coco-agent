@@ -49,6 +49,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+    user_id: int
 
 
 class UserOut(BaseModel):
@@ -101,6 +102,7 @@ async def login(
     return TokenResponse(
         access_token=access_token,
         expires_in=s.access_token_expire_minutes * 60,
+        user_id=user.id,
     )
 
 
