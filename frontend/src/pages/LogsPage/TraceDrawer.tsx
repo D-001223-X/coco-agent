@@ -7,7 +7,8 @@ interface TraceDrawerProps {
 }
 
 interface RetrievalHit {
-  chunk_id: string;
+  chunk_id?: string;
+  doc_index?: number;
   rrf_score?: number;
   faiss_score?: number | null;
   bm25_score?: number | null;

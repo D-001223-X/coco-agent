@@ -127,3 +127,10 @@ export interface RefusePhrase {
   value: string;
   description: string;
 }
+
+export interface KnowledgeChunk {
+  chunk_id: string;
+  section: string;
+  content_preview: string;
+  content_full: string;
+}
