@@ -31,6 +31,13 @@ async def setup_db(tmp_path):
         Path(__file__).resolve().parent.parent.parent
         / "knowledge_base" / "coco_knowledge.md"
     )
+    if not kb_path.exists():
+        # Fallback: read the first .md file in knowledge_base/
+        kb_dir = kb_path.parent
+        candidates = sorted(kb_dir.glob("*.md"))
+        if not candidates:
+            raise FileNotFoundError(f"No .md files in {kb_dir}")
+        kb_path = candidates[0]
     md_text = kb_path.read_text(encoding="utf-8")
     chunks = chunk_markdown(md_text)
 
