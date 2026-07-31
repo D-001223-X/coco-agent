@@ -100,9 +100,14 @@ export default function KnowledgeAdminPage() {
     if (!window.confirm("重建索引会重新解析全部知识库文档，确定继续？")) return;
     setBuilding(true);
     setError("");
+    setSuccess("");
     try {
-      await rebuildKnowledgeIndex();
-      setSuccess("索引重建完成");
+      const result = await rebuildKnowledgeIndex();
+      if (result.ok) {
+        setSuccess(result.message || "索引重建完成");
+      } else {
+        setError(result.message || "索引重建失败");
+      }
       load();
     } catch (err) {
       setError("索引重建失败");

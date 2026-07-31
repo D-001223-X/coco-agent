@@ -33,8 +33,11 @@ export async function deleteKnowledgeFile(filename: string): Promise<void> {
   await client.delete(`/admin/knowledge/${encodeURIComponent(filename)}`);
 }
 
-export async function rebuildKnowledgeIndex(): Promise<void> {
-  await client.post("/admin/knowledge/rebuild");
+export async function rebuildKnowledgeIndex(): Promise<{ ok: boolean; message: string }> {
+  const { data } = await client.post<ApiResp<{ ok: boolean; message: string }>>(
+    "/admin/knowledge/rebuild"
+  );
+  return data.data;
 }
 
 export async function fetchKnowledgeStatus(): Promise<KnowledgeStatus> {

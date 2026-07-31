@@ -25,11 +25,7 @@ from app.models import Base
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
 
-KB_PATH = (
-    Path(__file__).resolve().parent.parent.parent
-    / "knowledge_base"
-    / "coco_knowledge.md"
-)
+KB_DIR = Path(__file__).resolve().parent.parent.parent / "knowledge_base"
 
 VECTOR_DIM = 256
 
@@ -155,11 +151,26 @@ async def main() -> None:
     """Build and save all retrieval artifacts."""
     s = get_settings()
 
-    md_text = KB_PATH.read_text(encoding="utf-8")
-    logger.info("Read knowledge base: %d chars from %s", len(md_text), KB_PATH)
+    if not KB_DIR.exists():
+        raise FileNotFoundError(f"知识库目录不存在: {KB_DIR}")
 
-    chunks = chunk_markdown(md_text)
-    logger.info("Created %d chunks.", len(chunks))
+    md_files = sorted(KB_DIR.glob("*.md"))
+    if not md_files:
+        raise FileNotFoundError(
+            f"知识库目录为空，请先上传 .md 文件: {KB_DIR}"
+        )
+
+    # Merge chunks from all .md files; each chunk keeps a source file reference
+    chunks: list[dict] = []
+    for md_file in md_files:
+        md_text = md_file.read_text(encoding="utf-8")
+        file_chunks = chunk_markdown(md_text)
+        for c in file_chunks:
+            c["source_file"] = md_file.name
+        chunks.extend(file_chunks)
+        logger.info("Read %s: %d chars → %d chunks", md_file.name, len(md_text), len(file_chunks))
+
+    logger.info("Total chunks across %d files: %d", len(md_files), len(chunks))
 
     index, _ = build_faiss_index(chunks)
     faiss_path = Path(s.faiss_index_path).resolve()
