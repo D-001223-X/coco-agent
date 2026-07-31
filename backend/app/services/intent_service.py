@@ -132,6 +132,7 @@ confidence 评分标准：
 - 低于0.5：高度不确定
 
 注意：CHAT 类型的 confidence 不要高于 0.6，以防止将误判的闲聊导向跳过知识库检索。
+当用户问题涉及产品信息（如创始团队、公司背景、技术细节、服务器等），即使知识库中暂无相关信息，也应归类为 SUPPORT 而非 CHAT。
 """
 # MARKER: INTENT_PROMPT_END
 
