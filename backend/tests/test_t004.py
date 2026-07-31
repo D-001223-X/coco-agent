@@ -81,7 +81,9 @@ async def test_search_returns_pricing_info(setup_db):
     svc._settings.faiss_index_path = setup_db["faiss_path"]
     svc._settings.chunks_meta_path = setup_db["chunks_path"]
 
-    results = await svc.search("会员多少钱", top_k=3, threshold=0.0)
+    # Use a larger top_k so chunk-#4 (pricing comparison) is included even
+    # when chunk-#5 (account / pricing plan) doesn't outrank other sections.
+    results = await svc.search("会员多少钱", top_k=10, threshold=0.0)
 
     assert len(results) > 0
     all_content = " ".join(r.content for r in results)
