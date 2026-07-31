@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import Boolean, DateTime, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -44,6 +44,67 @@ class Message(Base):
     session_id: Mapped[str] = mapped_column(String(64), index=True)
     role: Mapped[str] = mapped_column(String(20))  # user / assistant / system
     content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class BadCase(Base):
+    """Bad-case record for the data flywheel (admin workflow)."""
+
+    __tablename__ = "bad_cases"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    user_question: Mapped[str] = mapped_column(Text, nullable=False)
+    system_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    intent: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="auto"
+    )  # auto / user_feedback / manual
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending"
+    )  # pending / calibrated / stored / ignored
+    ideal_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    calibrated_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    stored_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class PromptHistory(Base):
+    """Versioned history of prompt content (admin prompt management)."""
+
+    __tablename__ = "prompt_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    prompt_name: Mapped[str] = mapped_column(String(50), nullable=False)  # intent / support / chat
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    is_permanent: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_by: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="admin@app.com"
+    )
+
+
+class AuditLog(Base):
+    """Audit trail for admin operations (data flywheel, prompt edits...)."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_email: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

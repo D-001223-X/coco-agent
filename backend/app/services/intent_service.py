@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.admin.prompt_service import load_prompt
 from app.utils.logger import log_node
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class IntentResult:
 
 
 # ── System prompt (需求规格书 §8.1) ──────────────────────
+# MARKER: INTENT_PROMPT_START
 SYSTEM_PROMPT = """\
 你是"可可语伴"AI智能客服系统的意图识别引擎。你的任务是分析用户的最新消息，结合对话历史，准确判断用户意图并输出结构化 JSON。
 
@@ -124,6 +126,7 @@ confidence 评分标准：
 
 注意：CHAT 类型的 confidence 不要高于 0.6，以防止将误判的闲聊导向跳过知识库检索。
 """
+# MARKER: INTENT_PROMPT_END
 
 
 class IntentService:
@@ -214,7 +217,10 @@ class IntentService:
         """
         s = self._settings
 
-        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages: list[dict[str, str]] = [{
+            "role": "system",
+            "content": load_prompt("intent"),
+        }]
 
         # Append conversation history for coreference resolution
         for turn in history:

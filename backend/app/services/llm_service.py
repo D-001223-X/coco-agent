@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.admin.prompt_service import load_prompt
 from app.services.retrieval_service import RetrievedChunk
 from app.utils.logger import log_node
 
@@ -45,6 +46,22 @@ _REFUSE_REPLY = {
     "content": "暂时不能回答这个问题",
     "translation": "I cannot answer this question for now.",
 }
+
+# ── System prompts (admin-editable via markers) ───────────
+# MARKER: SUPPORT_PROMPT_START
+SUPPORT_SYSTEM_PROMPT = """\
+你是可可语伴产品客服助手。请基于以下知识内容，用中文回答用户的问题，回答需简洁、准确，控制在100字以内。在回答的最后，另起一行提供英文翻译。
+
+知识内容：
+{context}
+"""
+# MARKER: SUPPORT_PROMPT_END
+
+# MARKER: CHAT_PROMPT_START
+CHAT_SYSTEM_PROMPT = """\
+你是可可语伴的AI助手。请用友好、轻松的语气回复用户，回复内容控制在50字以内，无需翻译。
+"""
+# MARKER: CHAT_PROMPT_END
 
 
 class LLMService:
@@ -153,10 +170,7 @@ class LLMService:
                 "translation": "",
             }
 
-        system_prompt = (
-            "你是可可语伴的AI助手。请用友好、轻松的语气回复用户，"
-            "回复内容控制在50字以内，无需翻译。"
-        )
+        system_prompt = load_prompt("chat")
 
         raw = await self._call_deepseek(query, history, system_prompt)
         content = self._truncate(raw, 50)
@@ -188,12 +202,8 @@ class LLMService:
                 "translation": "",
             }
 
-        system_prompt = (
-            "你是可可语伴产品客服助手。请基于以下知识内容，用中文回答用户的问题，"
-            "回答需简洁、准确，控制在100字以内。"
-            "在回答的最后，另起一行提供英文翻译。\n\n"
-            f"知识内容：\n{context}"
-        )
+        base_prompt = load_prompt("support")
+        system_prompt = base_prompt.format(context=context)
 
         raw = await self._call_deepseek(query, [], system_prompt)
 

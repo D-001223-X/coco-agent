@@ -10,6 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.routers import auth, chat, logs, sessions
+from app.routers.admin import bad_cases as admin_bad_cases
+from app.routers.admin import knowledge as admin_knowledge
+from app.routers.admin import logs as admin_logs
+from app.routers.admin import params as admin_params
+from app.routers.admin import prompts as admin_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +41,11 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(logs.router)
 app.include_router(sessions.router)
+app.include_router(admin_knowledge.router)
+app.include_router(admin_prompts.router)
+app.include_router(admin_params.router)
+app.include_router(admin_logs.router)
+app.include_router(admin_bad_cases.router)
 
 
 # ── Global exception handlers ─────────────────────────────
