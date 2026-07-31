@@ -22,8 +22,9 @@ from app.routers.auth import get_current_user
 from app.services.intent_service import INTENT_CHAT, INTENT_FEEDBACK, INTENT_SUPPORT, IntentService
 from app.services.llm_service import LLMService
 from app.services.rerank_service import RerankService
-from app.services.retrieval_service import RetrievalService, RetrievedChunk
+from app.services.retrieval_service import RetrievedChunk
 from app.utils.logger import log_node
+from app.services.admin.param_service import get_retrieval_service
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -31,7 +32,7 @@ _KB_INTENTS = {INTENT_SUPPORT, INTENT_FEEDBACK}
 
 # ── Singleton services (lazy, safe to reuse) ─────────────
 _intent_service = IntentService()
-_retrieval_service = RetrievalService()
+_retrieval_service = get_retrieval_service()  # shared with admin param tuning
 _rerank_service = RerankService()
 _llm_service = LLMService()
 

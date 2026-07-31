@@ -73,10 +73,36 @@ def text_to_vector(text: str, dim: int = VECTOR_DIM) -> np.ndarray:
 class RetrievalService:
     """Hybrid retrieval combining FAISS and FTS5 with RRF fusion."""
 
+    # Admin-tunable parameter defaults (see ParamService / admin API)
+    DEFAULT_PARAMS: dict[str, float | int] = {
+        "faiss_top_k": 20,
+        "fts5_top_k": 20,
+        "threshold": 0.3,
+        "rrf_k": 60,
+        "final_top_k": 3,
+    }
+
     def __init__(self) -> None:
         self._settings = get_settings()
         self._faiss_index: faiss.Index | None = None
         self._chunks: list[dict] | None = None
+        self._params: dict[str, float | int] = dict(self.DEFAULT_PARAMS)
+
+    # ── Admin parameter management ─────────────────────────
+    def get_params(self) -> dict:
+        return dict(self._params)
+
+    def update_params(self, params: dict) -> dict:
+        for key, value in params.items():
+            if key in self.DEFAULT_PARAMS and value is not None:
+                self._params[key] = value
+        logger.info("[retrieval] params updated: %s", self._params)
+        return self.get_params()
+
+    def reset_params(self) -> dict:
+        self._params = dict(self.DEFAULT_PARAMS)
+        logger.info("[retrieval] params reset to defaults")
+        return self.get_params()
 
     # ── Lazy loader (called in thread pool) ───────────────
     def _load_index(self) -> None:
@@ -100,14 +126,25 @@ class RetrievalService:
     async def search(
         self,
         query: str,
-        top_k: int = 3,
-        threshold: float = 0.3,
+        top_k: int | None = None,
+        threshold: float | None = None,
         trace_id: str | None = None,
     ) -> list[RetrievedChunk]:
-        """Hybrid search: FAISS + FTS5 → RRF → threshold → top_k."""
+        """Hybrid search: FAISS + FTS5 → RRF → threshold → top_k.
+
+        When *top_k* / *threshold* are omitted, the current admin-tunable
+        params (``final_top_k`` / ``threshold``) are used — so tuning via
+        the admin API takes effect immediately.
+        """
         trace_id = trace_id or uuid.uuid4().hex
         start_ts = time.perf_counter()
         status = "ok"
+
+        # Use tunable params when not explicitly overridden by caller
+        if top_k is None:
+            top_k = int(self._params["final_top_k"])
+        if threshold is None:
+            threshold = float(self._params["threshold"])
 
         try:
             results = await self._hybrid_search(query, top_k, threshold)
@@ -154,10 +191,11 @@ class RetrievalService:
         top_k: int,
         threshold: float,
     ) -> list[RetrievedChunk]:
-        fetch_k = 20
+        faiss_k = int(self._params["faiss_top_k"])
+        fts5_k = int(self._params["fts5_top_k"])
 
-        faiss_task = asyncio.create_task(self._faiss_search(query, fetch_k, threshold))
-        fts5_task = asyncio.create_task(self._fts5_search(query, fetch_k))
+        faiss_task = asyncio.create_task(self._faiss_search(query, faiss_k, threshold))
+        fts5_task = asyncio.create_task(self._fts5_search(query, fts5_k))
 
         faiss_results, fts5_results = await asyncio.gather(
             faiss_task, fts5_task, return_exceptions=True
@@ -292,22 +330,23 @@ class RetrievalService:
         return scored[:k]
 
     # ── RRF fusion ─────────────────────────────────────────
-    @staticmethod
     def _rrf_fuse(
+        self,
         faiss_results: list[tuple[str, str, float, str]],
         fts5_results: list[tuple[str, str, float, str]],
     ) -> list[tuple[str, str, float, str]]:
+        rrf_k = int(self._params["rrf_k"])
         scores: dict[str, float] = {}
         meta: dict[str, tuple[str, str]] = {}
 
         for rank, (cid, content, _, section) in enumerate(faiss_results):
-            rrf = 1.0 / (_RRF_K + rank + 1)
+            rrf = 1.0 / (rrf_k + rank + 1)
             scores[cid] = scores.get(cid, 0.0) + rrf
             if cid not in meta:
                 meta[cid] = (content, section)
 
         for rank, (cid, content, _, section) in enumerate(fts5_results):
-            rrf = 1.0 / (_RRF_K + rank + 1)
+            rrf = 1.0 / (rrf_k + rank + 1)
             scores[cid] = scores.get(cid, 0.0) + rrf
             if cid not in meta:
                 meta[cid] = (content, section)
