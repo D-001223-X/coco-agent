@@ -162,6 +162,22 @@ class RetrievalService:
                     sections,
                 )
                 results = await self._hybrid_search(query, top_k, threshold, None)
+            # 章节限定结果不足时，用全库检索补充（soft-filter）：
+            # FAQ 细切分后，问答对可能落在未命中的章节，硬过滤会漏掉高分答案
+            elif sections and len(results) < top_k:
+                logger.info(
+                    "[retrieval] section-filtered results (%d) < top_k (%d) → augment with full search",
+                    len(results), top_k,
+                )
+                full = await self._hybrid_search(query, top_k, threshold, None)
+                seen = {r.chunk_id for r in results}
+                for r in full:
+                    if r.chunk_id not in seen:
+                        results.append(r)
+                        seen.add(r.chunk_id)
+                        if len(results) >= top_k:
+                            break
+                results.sort(key=lambda r: r.score, reverse=True)
         except Exception as exc:
             import traceback
             logger.error(
