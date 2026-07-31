@@ -130,7 +130,54 @@ class LLMService:
         except Exception as log_exc:
             logger.warning("log_node scheduling failed: %s", log_exc)
 
+        # ── Data flywheel: auto-collect bad cases (useful=false) ──
+        if not result.get("useful", False):
+            try:
+                await self._record_bad_case(
+                    trace_id=trace_id,
+                    query=query,
+                    answer=result.get("content", ""),
+                    intent=intent,
+                )
+            except Exception as exc:
+                logger.warning("Bad-case auto-collect failed: %s", exc)
+
         return result
+
+    # ── Data flywheel: auto-record bad case ────────────────
+    async def _record_bad_case(
+        self,
+        trace_id: str,
+        query: str,
+        answer: str,
+        intent: str,
+    ) -> None:
+        """Insert a BadCase row when the answer was not useful (idempotent)."""
+        try:
+            from sqlalchemy import select
+
+            from app.database import get_session_factory
+            from app.models import BadCase
+
+            factory = get_session_factory()
+            async with factory() as session:
+                exists = await session.execute(
+                    select(BadCase.id).where(BadCase.trace_id == trace_id)
+                )
+                if exists.scalar_one_or_none() is not None:
+                    return
+                session.add(BadCase(
+                    trace_id=trace_id,
+                    user_question=query,
+                    system_answer=answer,
+                    intent=intent,
+                    source="auto",
+                    status="pending",
+                ))
+                await session.commit()
+                logger.info("Bad case auto-recorded: trace=%s", trace_id)
+        except Exception as exc:
+            logger.warning("Bad-case insert failed: %s", exc)
 
     # ── Internal: routing by intent ────────────────────────
     async def _route(
