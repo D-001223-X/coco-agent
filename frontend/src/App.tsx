@@ -4,6 +4,14 @@ import { useAuthStore } from "./store/authStore";
 import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
 import LogsPage from "./pages/LogsPage";
+import AdminIndexPage from "./pages/Admin/AdminIndexPage";
+import KnowledgeAdminPage from "./pages/Admin/KnowledgeAdminPage";
+import PromptsAdminPage from "./pages/Admin/PromptsAdminPage";
+import PromptEditPage from "./pages/Admin/PromptEditPage";
+import ParamsAdminPage from "./pages/Admin/ParamsAdminPage";
+import LogsAdminPage from "./pages/Admin/LogsAdminPage";
+import BadCasesAdminPage from "./pages/Admin/BadCasesAdminPage";
+import BadCaseDetailPage from "./pages/Admin/BadCaseDetailPage";
 
 // Hydration gate: waits for Zustand persist to finish reading from
 // localStorage before rendering any route. Prevents the initial
@@ -42,6 +50,14 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/logs" element={<LogsPage />} />
+          <Route path="/admin" element={<AdminIndexPage />} />
+          <Route path="/admin/knowledge" element={<KnowledgeAdminPage />} />
+          <Route path="/admin/prompts" element={<PromptsAdminPage />} />
+          <Route path="/admin/prompts/:name" element={<PromptEditPage />} />
+          <Route path="/admin/params" element={<ParamsAdminPage />} />
+          <Route path="/admin/logs" element={<LogsAdminPage />} />
+          <Route path="/admin/bad-cases" element={<BadCasesAdminPage />} />
+          <Route path="/admin/bad-cases/:id" element={<BadCaseDetailPage />} />
           <Route path="/" element={<Navigate to="/chat" replace />} />
         </Routes>
       </HydrationGate>

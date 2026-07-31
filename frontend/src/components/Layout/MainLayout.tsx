@@ -8,11 +8,16 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
+  const user_id = useAuthStore((state) => state.user_id);
 
   const navItems = [
     { path: "/chat", label: "聊天" },
     { path: "/logs", label: "日志" },
   ];
+  // 仅 admin 可见管理后台入口
+  if (user_id === 1) {
+    navItems.push({ path: "/admin", label: "管理后台" });
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-warmwhite">
