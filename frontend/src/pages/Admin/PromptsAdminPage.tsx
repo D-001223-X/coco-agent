@@ -11,8 +11,9 @@ import type { PromptInfo, RefusePhrase } from "../../types";
 
 const PROMPT_META: Record<string, { desc: string; icon: string }> = {
   intent: { desc: "意图识别：判断 SUPPORT / FEEDBACK / CHAT", icon: "🧠" },
-  support: { desc: "客服回答：基于知识库生成回答", icon: "📖" },
+  support: { desc: "客服回答：基于知识库回答产品咨询", icon: "📖" },
   chat: { desc: "闲聊回复：友好轻松的日常对话", icon: "💬" },
+  feedback: { desc: "反馈处理：回应用户建议和反馈", icon: "✉️" },
 };
 
 export default function PromptsAdminPage() {

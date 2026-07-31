@@ -1,9 +1,10 @@
 """Prompt admin service: read/update prompts via file markers + version history.
 
 Prompt storage locations:
-  - intent  : backend/app/services/intent_service.py  (SYSTEM_PROMPT)
-  - support : backend/app/services/llm_service.py     (SUPPORT_SYSTEM_PROMPT)
-  - chat    : backend/app/services/llm_service.py     (CHAT_SYSTEM_PROMPT)
+  - intent   : backend/app/services/intent_service.py       (SYSTEM_PROMPT)
+  - support  : backend/app/services/llm_service.py          (SUPPORT_SYSTEM_PROMPT)
+  - chat     : backend/app/services/llm_service.py          (CHAT_SYSTEM_PROMPT)
+  - feedback : backend/app/services/prompts/feedback_prompt.py (FEEDBACK_SYSTEM_PROMPT)
 
 Each prompt is wrapped in ``# MARKER: <NAME>_PROMPT_START`` /
 ``# MARKER: <NAME>_PROMPT_END`` comment lines inside its source file.
@@ -29,9 +30,10 @@ PROMPT_SOURCES: dict[str, Path] = {
     "intent": BACKEND_DIR / "app" / "services" / "intent_service.py",
     "support": BACKEND_DIR / "app" / "services" / "llm_service.py",
     "chat": BACKEND_DIR / "app" / "services" / "llm_service.py",
+    "feedback": BACKEND_DIR / "app" / "services" / "prompts" / "feedback_prompt.py",
 }
 
-PROMPT_NAMES = ["intent", "support", "chat"]
+PROMPT_NAMES = ["intent", "support", "chat", "feedback"]
 
 _MARKER_RE = re.compile(
     r"# MARKER: (?P<name>\w+)_PROMPT_START\n"

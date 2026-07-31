@@ -2,7 +2,8 @@
 
 Architecture:
   • CHAT intent: friendly casual reply, never passes knowledge chunks.
-  • SUPPORT / FEEDBACK intent: knowledge-grounded reply with English translation.
+  • SUPPORT intent: knowledge-grounded reply.
+  • FEEDBACK intent: feedback response via dedicated prompt.
   • Empty chunks → refuse to answer (no hallucination).
   • Degrades gracefully: missing API key → mock mode; timeout/error → fallback.
   • Strict character-limit enforcement with truncation + "…".
@@ -35,17 +36,15 @@ _KB_INTENTS = {INTENT_SUPPORT, INTENT_FEEDBACK}
 # ── Mock chat reply (used when DASHSCOPE_API_KEY is empty) ─
 _MOCK_CHAT_REPLY = "你好呀，我是可可语伴的AI助手~"
 
-# ── Fallback / refusal replies (never translated) ──────────
+# ── Fallback / refusal replies ─────────────────────────────
 _FALLBACK_REPLY = {
     "useful": False,
     "content": "服务繁忙，请稍后再试",
-    "translation": "Service busy, please try again later.",
 }
 
 _REFUSE_REPLY = {
     "useful": False,
     "content": "暂时不能回答这个问题",
-    "translation": "I cannot answer this question for now.",
 }
 
 # ── System prompts (admin-editable via markers) ───────────
@@ -65,7 +64,7 @@ SUPPORT_SYSTEM_PROMPT = """\
 
 # MARKER: CHAT_PROMPT_START
 CHAT_SYSTEM_PROMPT = """\
-你是可可语伴的AI助手。请用友好、轻松的语气回复用户，回复内容控制在50字以内，无需翻译。
+你是可可语伴的AI助手。请用友好、轻松的语气回复用户，回复内容控制在50字以内。
 """
 # MARKER: CHAT_PROMPT_END
 
@@ -95,7 +94,7 @@ class LLMService:
         Returns
         -------
         dict
-            ``{"useful": bool, "content": str, "translation": str}``
+            ``{"useful": bool, "content": str}``
         """
         trace_id = trace_id or uuid.uuid4().hex
         start_ts = time.perf_counter()
@@ -222,14 +221,17 @@ class LLMService:
             return {
                 "useful": False,
                 "content": refuse_content,
-                "translation": "I cannot answer this question for now.",
             }
 
         # CHAT
         if intent == INTENT_CHAT:
             return await self._handle_chat(query, history)
 
-        # SUPPORT / FEEDBACK with chunks
+        # FEEDBACK with chunks → dedicated feedback handler
+        if intent == INTENT_FEEDBACK:
+            return await self._handle_feedback(query, chunks)
+
+        # SUPPORT with chunks
         return await self._handle_knowledge(query, chunks)
 
     # ── CHAT handler ──────────────────────────────────────
@@ -246,7 +248,6 @@ class LLMService:
             return {
                 "useful": True,
                 "content": _MOCK_CHAT_REPLY,
-                "translation": "",
             }
 
         system_prompt = load_prompt("chat")
@@ -256,7 +257,6 @@ class LLMService:
         return {
             "useful": True,
             "content": content,
-            "translation": "",
         }
 
     # ── SUPPORT / FEEDBACK handler ──────────────────────────
@@ -265,7 +265,7 @@ class LLMService:
         query: str,
         chunks: list[RetrievedChunk],
     ) -> dict[str, Any]:
-        """Knowledge-based answer with translation."""
+        """Knowledge-based answer."""
         s = self._settings
 
         # Build context from chunks
@@ -278,7 +278,6 @@ class LLMService:
             return {
                 "useful": True,
                 "content": truncated,
-                "translation": "",
             }
 
         base_prompt = load_prompt("support")
@@ -286,15 +285,40 @@ class LLMService:
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
-        # Split content and translation (first line = content, rest = translation)
-        parts = raw.strip().split("\n", 1)
-        content = self._truncate(parts[0].strip(), 100)
-        translation = parts[1].strip() if len(parts) > 1 else ""
+        content = self._truncate(raw.strip(), 100)
 
         return {
             "useful": True,
             "content": content,
-            "translation": translation,
+        }
+
+    # ── FEEDBACK handler ──────────────────────────────────
+    async def _handle_feedback(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+    ) -> dict[str, Any]:
+        """Handle FEEDBACK intent: judge whether the suggestion is covered by KB."""
+        s = self._settings
+
+        # Mock mode: no API key → generic acknowledgement
+        if not s.dashscope_api_key:
+            return {
+                "useful": True,
+                "content": "感谢您的反馈，我们会认真考虑。",
+            }
+
+        context = "\n---\n".join(c.content for c in chunks)
+        base_prompt = load_prompt("feedback")
+        system_prompt = base_prompt.format(query=query, context=context)
+
+        raw = await self._call_deepseek(query, [], system_prompt)
+
+        # The prompt may output plain text or JSON — strip to text
+        content = self._truncate(raw.strip(), 60)
+        return {
+            "useful": True,
+            "content": content,
         }
 
     # ── DeepSeek API call ─────────────────────────────────

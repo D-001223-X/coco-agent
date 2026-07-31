@@ -46,7 +46,6 @@ class ChatRequest(BaseModel):
 class ResponseContent(BaseModel):
     useful: bool
     content: str
-    translation: str = ""
 
 
 class ChatResponse(BaseModel):
@@ -139,10 +138,12 @@ async def chat(
         if intent_result.intent in _KB_INTENTS:
             # SUPPORT / FEEDBACK: retrieve → rerank
             # 章节限定检索：若意图识别输出 related_sections，仅在该章节内检索
+            # FEEDBACK 使用更宽松的检索参数（阈值更低，确保能召回相关知识）
+            is_feedback = intent_result.intent == "FEEDBACK"
             retrieved = await _retrieval_service.search(
                 intent_result.resolved_question,
-                top_k=s.top_k,
-                threshold=s.score_threshold,
+                top_k=3 if is_feedback else s.top_k,
+                threshold=0.15 if is_feedback else s.score_threshold,
                 trace_id=trace_id,
                 sections=intent_result.related_sections,
             )
@@ -202,7 +203,6 @@ async def chat(
             response=ResponseContent(
                 useful=llm_result.get("useful", False),
                 content=llm_result.get("content", ""),
-                translation=llm_result.get("translation", ""),
             ),
             intent=intent_result.intent,
             resolved_question=intent_result.resolved_question,

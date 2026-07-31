@@ -83,7 +83,7 @@ async def test_generate_chat(service):
     assert len(result["content"]) <= 50, (
         f"CHAT reply too long: {len(result['content'])} chars"
     )
-    assert result["translation"] == ""
+    assert "translation" not in result
 
 
 # ── Test 3: SUPPORT + empty chunks → refuse, no API call ──

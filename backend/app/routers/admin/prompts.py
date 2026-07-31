@@ -121,28 +121,34 @@ async def test_prompt(
                 },
                 "msg": "success",
             }
-        # support / chat → run through LLM service
+        # support / chat / feedback → run through LLM service
         from app.services.llm_service import LLMService
 
         llm = LLMService()
         from app.services.retrieval_service import RetrievedChunk
 
         chunks: list[RetrievedChunk] = []
-        if name == "support":
+        intent = "SUPPORT"
+        if name in ("support", "feedback"):
             from app.services.retrieval_service import RetrievalService
 
-            retrieved = await RetrievalService().search(question, top_k=3, threshold=0.3)
+            retrieved = await RetrievalService().search(
+                question, top_k=3, threshold=0.15
+            )
             chunks = retrieved
+            intent = "SUPPORT" if name == "support" else "FEEDBACK"
+        else:  # chat
+            intent = "CHAT"
         resp = await llm.generate(
             query=question,
             history=[],
             chunks=chunks,
-            intent="SUPPORT" if name == "support" else "CHAT",
+            intent=intent,
         )
         return {
             "code": 0,
             "data": {
-                "intent": "SUPPORT" if name == "support" else "CHAT",
+                "intent": intent,
                 "resolved_question": question,
                 "response": resp.get("content", ""),
                 "useful": resp.get("useful", False),

@@ -25,7 +25,6 @@ export interface ChatResponse {
   response: {
     useful: boolean;
     content: string;
-    translation: string;
   };
   intent: string;
   resolved_question: string;
