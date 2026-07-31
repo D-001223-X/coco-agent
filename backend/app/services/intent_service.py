@@ -43,6 +43,7 @@ class IntentResult:
     confidence: float
     resolved_question: str
     reason: str
+    related_sections: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -115,8 +116,14 @@ SYSTEM_PROMPT = """\
   "intent": "SUPPORT | FEEDBACK | CHAT",
   "confidence": 0.0到1.0之间的浮点数,
   "resolved_question": "消解指代后的完整问题",
-  "reason": "简要说明为什么判断为该意图"
+  "reason": "简要说明为什么判断为该意图",
+  "related_sections": ["知识库中与问题相关的章节标题数组，无匹配时为空数组"]
 }
+
+related_sections 说明：
+- 从知识库章节标题中识别与用户问题最相关的 1-3 个章节（如"五、会员与付费方案"、"六、使用指南"）。
+- 如果无法确定对应章节，输出空数组 []。
+- 该字段用于限定检索范围，提高检索精度。
 
 confidence 评分标准：
 - 0.9-1.0：意图非常明确，无歧义
@@ -299,10 +306,14 @@ class IntentService:
 
         resolved = data.get("resolved_question") or original_query
         reason = data.get("reason") or ""
+        related = data.get("related_sections")
+        if not isinstance(related, list):
+            related = None
 
         return IntentResult(
             intent=intent,
             confidence=float(confidence),
             resolved_question=str(resolved),
             reason=str(reason),
+            related_sections=related,
         )

@@ -121,3 +121,9 @@ export interface BadCase {
   calibrated_by: string;
   stored_at: string;
 }
+
+export interface RefusePhrase {
+  key: string;
+  value: string;
+  description: string;
+}

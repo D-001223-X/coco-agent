@@ -131,12 +131,17 @@ class RetrievalService:
         top_k: int | None = None,
         threshold: float | None = None,
         trace_id: str | None = None,
+        sections: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         """Hybrid search: FAISS + FTS5 → RRF → threshold → top_k.
 
         When *top_k* / *threshold* are omitted, the current admin-tunable
         params (``final_top_k`` / ``threshold``) are used — so tuning via
         the admin API takes effect immediately.
+
+        *sections*: optional list of section names to restrict retrieval to.
+        When provided, chunks whose ``section`` doesn't match are excluded
+        (intent-driven section-constrained retrieval).
         """
         trace_id = trace_id or uuid.uuid4().hex
         start_ts = time.perf_counter()
@@ -149,7 +154,14 @@ class RetrievalService:
             threshold = float(self._params["threshold"])
 
         try:
-            results = await self._hybrid_search(query, top_k, threshold)
+            results = await self._hybrid_search(query, top_k, threshold, sections)
+            # 章节限定检索无结果时，回退全库检索（兜底，防止误拒）
+            if not results and sections:
+                logger.info(
+                    "[retrieval] section-filtered (%s) empty → fallback to full search",
+                    sections,
+                )
+                results = await self._hybrid_search(query, top_k, threshold, None)
         except Exception as exc:
             import traceback
             logger.error(
@@ -197,18 +209,66 @@ class RetrievalService:
 
         return results
 
+    # ── Section matching (fuzzy, tolerant of LLM title drift) ─
+    @staticmethod
+    def _section_matches(section: str, targets: list[str]) -> bool:
+        """Loose match: strip numbering prefix, then substring/keyword overlap.
+
+        Handles cases where the LLM returns e.g. "五、会员与付费方案" while the
+        real section title is "五、账号与付费方案".
+        """
+        import re as _re
+
+        def _clean(text: str) -> str:
+            # strip leading numbering like "五、" / "5." / "5、"
+            cleaned = _re.sub(r"^[一二三四五六七八九十\d]+\s*[、.．]\s*", "", text.strip())
+            return cleaned
+
+        if not targets:
+            return True
+
+        section = section.strip()
+        if not section:
+            # 空章节（如文档头部）不参与章节限定匹配
+            return False
+
+        section_clean = _clean(section)
+        for target in targets:
+            target_clean = _clean(target)
+            if not target_clean:
+                continue
+            # exact or substring in either direction
+            if (
+                target_clean in section_clean
+                or section_clean in target_clean
+                or target_clean in section
+                or section in target_clean
+            ):
+                return True
+        # keyword overlap: any 2-char+ shared token between target and section
+        for target in targets:
+            target_clean = _clean(target)
+            for i in range(len(target_clean) - 1):
+                token = target_clean[i : i + 2]
+                if len(token) == 2 and token in section_clean:
+                    return True
+        return False
+
     # ── Internal: hybrid search ────────────────────────────
     async def _hybrid_search(
         self,
         query: str,
         top_k: int,
         threshold: float,
+        sections: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         faiss_k = int(self._params["faiss_top_k"])
         fts5_k = int(self._params["fts5_top_k"])
 
-        faiss_task = asyncio.create_task(self._faiss_search(query, faiss_k, threshold))
-        fts5_task = asyncio.create_task(self._fts5_search(query, fts5_k))
+        faiss_task = asyncio.create_task(
+            self._faiss_search(query, faiss_k, threshold, sections)
+        )
+        fts5_task = asyncio.create_task(self._fts5_search(query, fts5_k, sections))
 
         faiss_results, fts5_results = await asyncio.gather(
             faiss_task, fts5_task, return_exceptions=True
@@ -251,7 +311,11 @@ class RetrievalService:
 
     # ── FAISS vector search (thread pool) ──────────────────
     async def _faiss_search(
-        self, query: str, k: int, threshold: float = 0.0
+        self,
+        query: str,
+        k: int,
+        threshold: float = 0.0,
+        sections: list[str] | None = None,
     ) -> list[tuple[str, str, float, str]]:
         await asyncio.to_thread(self._load_index)
 
@@ -262,7 +326,7 @@ class RetrievalService:
             vec = text_to_vector(query).reshape(1, -1)
             faiss.normalize_L2(vec)
 
-            k_actual = min(k, self._faiss_index.ntotal)
+            k_actual = min(k * 2, self._faiss_index.ntotal)
             if k_actual == 0:
                 return []
 
@@ -276,6 +340,8 @@ class RetrievalService:
                 if score < threshold:
                     continue
                 chunk = self._chunks[idx]
+                if not self._section_matches(chunk.get("section", ""), sections):
+                    continue
                 results.append((
                     chunk["chunk_id"],
                     chunk["content"],
@@ -288,7 +354,7 @@ class RetrievalService:
 
     # ── FTS5 BM25 search (async SQLAlchemy) ────────────────
     async def _fts5_search(
-        self, query: str, k: int
+        self, query: str, k: int, sections: list[str] | None = None
     ) -> list[tuple[str, str, float, str]]:
         session_factory = get_session_factory()
 
@@ -312,10 +378,26 @@ class RetrievalService:
 
         logger.debug("[retrieval] FTS5 query=%r tokens=%r rows=%d", query, tokens, len(rows))
 
+        # Section filter for FTS5 rows (fallback keyword path filters too)
+        def _match(row) -> bool:
+            if not sections:
+                return True
+            # fetch section via chunks metadata for the given chunk_id
+            section = ""
+            if self._chunks:
+                for c in self._chunks:
+                    if c.get("chunk_id") == str(row[0]):
+                        section = c.get("section") or ""
+                        break
+            return self._section_matches(section, sections)
+
+        if sections:
+            rows = [r for r in rows if _match(r)]
+
         # If FTS5 returns no results (common for Chinese text with unicode61),
         # fall back to Python-based keyword matching on all chunks.
         if not rows and self._chunks:
-            rows = self._fallback_keyword_search(query, tokens, k)
+            rows = self._fallback_keyword_search(query, tokens, k, sections)
 
         return [
             (str(row[0]), row[1], float(abs(row[2])), "")
@@ -324,7 +406,7 @@ class RetrievalService:
 
     # ── Fallback keyword search (for Chinese text) ──────────
     def _fallback_keyword_search(
-        self, query: str, tokens: list[str], k: int
+        self, query: str, tokens: list[str], k: int, sections: list[str] | None = None
     ) -> list[tuple[str, str, float]]:
         """Score chunks by keyword match when FTS5 can't handle the text."""
         if not self._chunks:
@@ -332,6 +414,10 @@ class RetrievalService:
 
         scored: list[tuple[str, str, float]] = []
         for chunk in self._chunks:
+            if sections:
+                section = (chunk.get("section") or "").strip()
+                if not any(s and s in section for s in sections):
+                    continue
             content = chunk["content"]
             score = 0.0
             for token in tokens:

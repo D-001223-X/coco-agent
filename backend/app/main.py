@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.routers import auth, chat, logs, sessions
 from app.routers.admin import bad_cases as admin_bad_cases
+from app.routers.admin import config as admin_config
 from app.routers.admin import knowledge as admin_knowledge
 from app.routers.admin import logs as admin_logs
 from app.routers.admin import params as admin_params
@@ -46,6 +47,7 @@ app.include_router(admin_prompts.router)
 app.include_router(admin_params.router)
 app.include_router(admin_logs.router)
 app.include_router(admin_bad_cases.router)
+app.include_router(admin_config.router)
 
 
 # ── Global exception handlers ─────────────────────────────

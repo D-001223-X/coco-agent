@@ -138,11 +138,13 @@ async def chat(
 
         if intent_result.intent in _KB_INTENTS:
             # SUPPORT / FEEDBACK: retrieve → rerank
+            # 章节限定检索：若意图识别输出 related_sections，仅在该章节内检索
             retrieved = await _retrieval_service.search(
                 intent_result.resolved_question,
                 top_k=s.top_k,
                 threshold=s.score_threshold,
                 trace_id=trace_id,
+                sections=intent_result.related_sections,
             )
             if retrieved:
                 doc_texts = [c.content for c in retrieved]

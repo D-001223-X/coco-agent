@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.admin.config_service import get_config_value
 from app.services.admin.prompt_service import load_prompt
 from app.services.retrieval_service import RetrievedChunk
 from app.utils.logger import log_node
@@ -146,6 +147,27 @@ class LLMService:
 
         return result
 
+    # ── Refusal phrase from config (async, DB-backed) ──────
+    async def _get_refuse_phrase(self) -> str:
+        """Load the 'refuse_uncovered' phrase from system config (DB)."""
+        try:
+            from sqlalchemy import select
+
+            from app.database import get_session_factory
+            from app.models import SystemConfig
+
+            factory = get_session_factory()
+            async with factory() as session:
+                result = await session.execute(
+                    select(SystemConfig.value).where(SystemConfig.key == "refuse_uncovered")
+                )
+                value = result.scalar_one_or_none()
+                if value:
+                    return value
+        except Exception:
+            pass
+        return "暂时不能回答这个问题"
+
     # ── Data flywheel: auto-record bad case ────────────────
     async def _record_bad_case(
         self,
@@ -193,7 +215,12 @@ class LLMService:
 
         # SUPPORT / FEEDBACK with empty chunks: refuse (never call LLM)
         if intent in _KB_INTENTS and not chunks:
-            return dict(_REFUSE_REPLY)
+            refuse_content = await self._get_refuse_phrase()
+            return {
+                "useful": False,
+                "content": refuse_content,
+                "translation": "I cannot answer this question for now.",
+            }
 
         # CHAT
         if intent == INTENT_CHAT:

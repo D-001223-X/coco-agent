@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 # Knowledge base file (repo root /knowledge_base/coco_knowledge.md)
 KB_PATH = Path(__file__).resolve().parent.parent.parent.parent.parent / "knowledge_base" / "coco_knowledge.md"
 
-DRAFT_PROMPT = """你是一个知识库编辑助手。请根据以下用户问题和系统回答，生成一个知识库条目。
+DRAFT_PROMPT = """你是一个知识库编辑助手。用户问的是「{question}」，上下文是「{context}」。
 
-用户问题：{question}
-系统回答：{answer}
+请为可可语伴产品生成一个可直接入库的知识条目，格式如下：
 
-请生成 Markdown 格式的知识条目，包含：
-- 一个清晰的标题（用 ##）
-- 回答内容（用 - 列表，不超过100字）
+## 标题
+- 回答内容（1-3点，直接针对用户问题，不要通用解释）
+
+不要输出通用解释，只输出具体的产品知识。如果用户问题无法对应到具体产品信息，请输出"无法生成"。
 """
 
 
@@ -116,13 +116,58 @@ class BadCaseService:
 
     # ── AI draft generation ────────────────────────────────
     async def generate_draft(self, db: AsyncSession, bad_case: BadCase) -> str:
+        """Generate a KB-ready draft using the bad case's full context.
+
+        Context = user question + system answer + intent + related chat history.
+        """
         llm = LLMService()
+
+        # Build richer context: system answer + intent + history from messages
+        context_parts: list[str] = []
+        if bad_case.system_answer:
+            context_parts.append(f"系统回答：{bad_case.system_answer}")
+        if bad_case.intent:
+            context_parts.append(f"用户意图：{bad_case.intent}")
+        if bad_case.trace_id:
+            history = await self._trace_context(db, bad_case.trace_id)
+            if history:
+                context_parts.append(f"对话历史：{history}")
+
+        context = "\n".join(context_parts) if context_parts else "（无额外上下文）"
+
         prompt = DRAFT_PROMPT.format(
             question=bad_case.user_question,
-            answer=bad_case.system_answer or "",
+            context=context,
         )
         result = await llm._call_deepseek(bad_case.user_question, [], prompt)
+        # If the model refuses to generate, keep raw (may be "无法生成")
         return result
+
+    async def _trace_context(self, db: AsyncSession, trace_id: str) -> str:
+        """Gather the user/assistant message pair from this trace's session."""
+        try:
+            from sqlalchemy import select
+
+            from app.models import Log, Message
+
+            log_result = await db.execute(
+                select(Log.session_id).where(Log.trace_id == trace_id).limit(1)
+            )
+            session_id = log_result.scalar_one_or_none()
+            if not session_id:
+                return ""
+
+            msg_result = await db.execute(
+                select(Message.content, Message.role)
+                .where(Message.session_id == session_id)
+                .order_by(Message.id.desc())
+                .limit(4)
+            )
+            rows = msg_result.all()
+            lines = [f"{role}: {content[:80]}" for role, content in reversed(rows)]
+            return "；".join(lines)
+        except Exception:
+            return ""
 
     # ── Store into knowledge base + rebuild index ─────────
     async def store_bad_case(

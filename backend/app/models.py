@@ -110,6 +110,20 @@ class AuditLog(Base):
     )
 
 
+class SystemConfig(Base):
+    """Key-value system configuration (refusal phrases, etc.)."""
+
+    __tablename__ = "system_config"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Log(Base):
     __tablename__ = "logs"
 

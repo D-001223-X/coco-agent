@@ -106,6 +106,31 @@ export async function testPrompt(
   return data.data;
 }
 
+// ── Config (refusal phrases) ───────────────────────────
+export interface RefusePhrase {
+  key: string;
+  value: string;
+  description: string;
+}
+
+export async function fetchRefusePhrases(): Promise<Record<string, RefusePhrase>> {
+  const { data } = await client.get<ApiResp<Record<string, RefusePhrase>>>(
+    "/admin/config/refuse-phrases"
+  );
+  return data.data;
+}
+
+export async function updateRefusePhrase(
+  key: string,
+  value: string
+): Promise<{ key: string; value: string }> {
+  const { data } = await client.put<ApiResp<{ key: string; value: string }>>(
+    `/admin/config/refuse-phrases/${key}`,
+    { value }
+  );
+  return data.data;
+}
+
 // ── Params ─────────────────────────────────────────────
 export async function fetchParams(): Promise<ParamsInfo> {
   const { data } = await client.get<ApiResp<ParamsInfo>>("/admin/params");
