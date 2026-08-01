@@ -7,6 +7,7 @@ import { useSessionStore } from "../../../store/sessionStore";
 
 export function ChatArea() {
   const currentSessionId = useSessionStore((state) => state.currentSessionId);
+  const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
   const loadSessions = useSessionStore((state) => state.loadSessions);
 
   const messagesMap = useChatStore((state) => state.messagesMap);
@@ -23,7 +24,12 @@ export function ChatArea() {
   }, [currentSessionId, loadMessages]);
 
   const handleSend = async (content: string) => {
-    await sendMessage(currentSessionId, content);
+    const data = await sendMessage(currentSessionId, content);
+    // 首次发送（无会话）：后端返回新 session_id，立即切换到该会话，
+    // 否则页面停留在空白初始状态（currentSessionId 仍为空）。
+    if (data.session_id && data.session_id !== currentSessionId) {
+      setCurrentSession(data.session_id);
+    }
     // Refresh session list to show new session and updated message counts
     await loadSessions();
   };
