@@ -12,6 +12,11 @@ import ParamsAdminPage from "./pages/Admin/ParamsAdminPage";
 import LogsAdminPage from "./pages/Admin/LogsAdminPage";
 import BadCasesAdminPage from "./pages/Admin/BadCasesAdminPage";
 import BadCaseDetailPage from "./pages/Admin/BadCaseDetailPage";
+import AssessmentPage from "./pages/Practice/AssessmentPage";
+import AssessmentQuestionPage from "./pages/Practice/AssessmentQuestionPage";
+import AssessmentResultPage from "./pages/Practice/AssessmentResultPage";
+import GoalsPage from "./pages/Practice/GoalsPage";
+import PlanPage from "./pages/Practice/PlanPage";
 
 // Hydration gate: waits for Zustand persist to finish reading from
 // localStorage before rendering any route. Prevents the initial
@@ -58,6 +63,11 @@ function App() {
           <Route path="/admin/logs" element={<LogsAdminPage />} />
           <Route path="/admin/bad-cases" element={<BadCasesAdminPage />} />
           <Route path="/admin/bad-cases/:id" element={<BadCaseDetailPage />} />
+          <Route path="/practice/assessment" element={<AssessmentPage />} />
+          <Route path="/practice/assessment/questions" element={<AssessmentQuestionPage />} />
+          <Route path="/practice/assessment/result" element={<AssessmentResultPage />} />
+          <Route path="/practice/goals" element={<GoalsPage />} />
+          <Route path="/practice/plan" element={<PlanPage />} />
           <Route path="/" element={<Navigate to="/chat" replace />} />
         </Routes>
       </HydrationGate>
