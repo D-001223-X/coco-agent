@@ -27,19 +27,15 @@ async def setup_db(tmp_path):
     await init_db(database_url=db_url)
 
     # Read knowledge base and build artifacts
-    kb_path = (
-        Path(__file__).resolve().parent.parent.parent
-        / "knowledge_base" / "coco_knowledge.md"
-    )
-    if not kb_path.exists():
-        # Fallback: read the first .md file in knowledge_base/
-        kb_dir = kb_path.parent
-        candidates = sorted(kb_dir.glob("*.md"))
-        if not candidates:
-            raise FileNotFoundError(f"No .md files in {kb_dir}")
-        kb_path = candidates[0]
-    md_text = kb_path.read_text(encoding="utf-8")
-    chunks = chunk_markdown(md_text)
+    # 与 build_index 一致：合并 knowledge_base/ 下所有 .md 文件
+    kb_dir = Path(__file__).resolve().parent.parent.parent / "knowledge_base"
+    md_files = sorted(kb_dir.glob("*.md"))
+    if not md_files:
+        raise FileNotFoundError(f"No .md files in {kb_dir}")
+    chunks: list[dict] = []
+    for md_file in md_files:
+        md_text = md_file.read_text(encoding="utf-8")
+        chunks.extend(chunk_markdown(md_text))
 
     # Build FAISS index + chunks.json in tmp_path
     index, _ = build_faiss_index(chunks)
