@@ -12,6 +12,7 @@ Architecture:
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -285,7 +286,9 @@ class LLMService:
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
-        content = self._truncate(raw.strip(), 100)
+        # Defense in depth: if the admin-tuned support prompt ever asks the
+        # model for JSON output, unwrap it; otherwise use the plain text.
+        content = self._extract_json_content(raw, max_chars=100)
 
         return {
             "useful": True,
@@ -310,16 +313,61 @@ class LLMService:
 
         context = "\n---\n".join(c.content for c in chunks)
         base_prompt = load_prompt("feedback")
-        system_prompt = base_prompt.format(query=query, context=context)
+        system_prompt = self._fill_prompt(base_prompt, query=query, context=context)
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
-        # The prompt may output plain text or JSON — strip to text
-        content = self._truncate(raw.strip(), 60)
+        # The model is instructed to reply as JSON {"content": "..."} —
+        # parse it, degrade to plain text if parsing fails.
+        content = self._extract_json_content(raw, max_chars=100)
         return {
             "useful": True,
             "content": content,
         }
+
+    # ── Prompt helpers ────────────────────────────────────
+    @staticmethod
+    def _fill_prompt(template: str, query: str, context: str) -> str:
+        """Fill a prompt template supporting ``{query}/{context}`` and
+        ``%S/%s/%`` placeholder styles (both are used across admin prompts).
+        """
+        # 1) Python str.format: expands {{ }} escapes and {query}/{context}
+        text = template.format(query=query, context=context)
+        # 2) Legacy %-style placeholders used by the FEEDBACK prompt:
+        text = text.replace("%S", context).replace("%s", query)
+        # 3) Bare '%' marker for knowledge section (must run after %S/%s)
+        text = text.replace("%", context)
+        return text
+
+    @staticmethod
+    def _extract_json_content(raw: str, max_chars: int = 100) -> str:
+        """Extract ``content`` from a JSON-wrapped model reply.
+
+        Handles plain text, JSON objects (with/without markdown fences) and
+        JSON containing a ``content`` key. Falls back to the raw text.
+        """
+        text = (raw or "").strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            lines = text.split("\n")
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
+        # Try JSON parse
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                content = data.get("content")
+                if isinstance(content, str) and content.strip():
+                    return LLMService._truncate(content.strip(), max_chars)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Fallback: use raw text as-is
+        return LLMService._truncate(text, max_chars)
 
     # ── DeepSeek API call ─────────────────────────────────
     async def _call_deepseek(
