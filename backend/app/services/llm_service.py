@@ -74,7 +74,7 @@ SUPPORT_SYSTEM_PROMPT = """\
 
 # MARKER: CHAT_PROMPT_START
 CHAT_SYSTEM_PROMPT = """\
-你是可可语伴的AI助手。请用友好、轻松的语气回复用户，回复内容控制在50字以内。
+你是可可语伴的AI助手。请用友好、轻松的语气回复用户，回复内容控制在100字以内。
 """
 # MARKER: CHAT_PROMPT_END
 
@@ -142,6 +142,7 @@ class LLMService:
                 },
                 output_data={
                     "useful": result.get("useful", False),
+                    "content": result.get("content", ""),
                     "content_preview": result.get("content", "")[:50],
                 },
                 duration_ms=duration_ms,
@@ -272,7 +273,8 @@ class LLMService:
         system_prompt = load_prompt("chat")
 
         raw = await self._call_deepseek(query, history, system_prompt)
-        content = self._truncate(raw, 50)
+        # 防御性解析 + 放宽兜底到 800 字：字数由提示词控制，不硬编码截断
+        content = self._extract_json_content(raw, max_chars=800)
         return {
             "useful": True,
             "content": content,
