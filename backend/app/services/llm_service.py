@@ -55,8 +55,9 @@ SUPPORT_SYSTEM_PROMPT = """\
 
 回答要求：
 1. 直接基于知识内容回答，不要使用外部知识
-2. 回答简洁、准确，控制在 100 字以内
-3. 如果用户问题无法通过知识内容回答，回答："这个问题我暂时无法回答"
+2. 回答简洁、准确，控制在 150 字以内
+3. 回答时，如果用户问题包含“他”、“这个”等代词，优先从最近 3 轮对话中查找指代对象。 
+4. 如果用户问题无法通过知识内容回答，回答："这个问题我暂时无法回答"
 
 【知识内容】
 {context}
@@ -286,9 +287,9 @@ class LLMService:
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
-        # Defense in depth: if the admin-tuned support prompt ever asks the
-        # model for JSON output, unwrap it; otherwise use the plain text.
-        content = self._extract_json_content(raw, max_chars=100)
+        # 防御性解析（JSON 解包 / 纯文本兜底）。上限放宽到 800 字，
+        # 实际长度由提示词控制——硬编码截断会砍掉 LLM 的完整回答。
+        content = self._extract_json_content(raw, max_chars=800)
 
         return {
             "useful": True,
@@ -319,7 +320,7 @@ class LLMService:
 
         # The model is instructed to reply as JSON {"content": "..."} —
         # parse it, degrade to plain text if parsing fails.
-        content = self._extract_json_content(raw, max_chars=100)
+        content = self._extract_json_content(raw, max_chars=800)
         return {
             "useful": True,
             "content": content,
@@ -340,7 +341,7 @@ class LLMService:
         return text
 
     @staticmethod
-    def _extract_json_content(raw: str, max_chars: int = 100) -> str:
+    def _extract_json_content(raw: str, max_chars: int = 800) -> str:
         """Extract ``content`` from a JSON-wrapped model reply.
 
         Handles plain text, JSON objects (with/without markdown fences) and
@@ -395,7 +396,7 @@ class LLMService:
             "model": s.deepseek_model,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": 512,
+            "max_tokens": 2048,
         }
 
         headers = {
