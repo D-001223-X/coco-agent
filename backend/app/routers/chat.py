@@ -170,6 +170,7 @@ async def chat(
             chunks=llm_input_chunks,
             intent=llm_intent,
             trace_id=trace_id,
+            reference_candidates=intent_result.reference_candidates,
         )
 
         # ── 5. Persist messages ──────────────────────────────

@@ -59,6 +59,14 @@ SUPPORT_SYSTEM_PROMPT = """\
 3. 回答时，如果用户问题包含“他”、“这个”等代词，优先从最近 3 轮对话中查找指代对象。 
 4. 如果用户问题无法通过知识内容回答，回答："这个问题我暂时无法回答"
 
+【可能的指代对象】
+{candidates}
+
+【指代回答规则】
+1. 如果候选对象有多个（如基础会员和大会员），必须分别解释每个对象的价值（价格、权益、适用人群），避免只覆盖其中一个
+2. 如果只有一个候选对象，针对该对象解释性价比
+3. 如果没有候选对象（无明确指代），正常基于知识内容回答
+
 【知识内容】
 {context}
 """
@@ -85,6 +93,7 @@ class LLMService:
         chunks: list[RetrievedChunk],
         intent: str,
         trace_id: str | None = None,
+        reference_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
         """Generate a response based on *intent*, *chunks* and *query*.
 
@@ -92,6 +101,9 @@ class LLMService:
         ----------
         trace_id : str | None
             Shared trace id for correlating all nodes in the chat pipeline.
+        reference_candidates : list[dict] | None
+            Candidate reference objects (from intent recognition) used to
+            explain each possible referent when multiple are ambiguous.
 
         Returns
         -------
@@ -106,7 +118,9 @@ class LLMService:
         service_name = "DeepSeek"
 
         try:
-            result = await self._route(query, history, chunks, intent)
+            result = await self._route(
+                query, history, chunks, intent, reference_candidates
+            )
             # If we hit mock mode, the service is "Mock"
             if not self._settings.dashscope_api_key:
                 service_name = "Mock"
@@ -214,6 +228,7 @@ class LLMService:
         history: list[dict[str, str]],
         chunks: list[RetrievedChunk],
         intent: str,
+        reference_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
         """Route to appropriate handler based on intent."""
 
@@ -231,10 +246,12 @@ class LLMService:
 
         # FEEDBACK with chunks → dedicated feedback handler
         if intent == INTENT_FEEDBACK:
-            return await self._handle_feedback(query, chunks)
+            return await self._handle_feedback(
+                query, chunks, reference_candidates
+            )
 
         # SUPPORT with chunks
-        return await self._handle_knowledge(query, chunks)
+        return await self._handle_knowledge(query, chunks, reference_candidates)
 
     # ── CHAT handler ──────────────────────────────────────
     async def _handle_chat(
@@ -266,6 +283,7 @@ class LLMService:
         self,
         query: str,
         chunks: list[RetrievedChunk],
+        reference_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
         """Knowledge-based answer."""
         s = self._settings
@@ -282,8 +300,11 @@ class LLMService:
                 "content": truncated,
             }
 
+        candidates_text = self._format_candidates(reference_candidates)
         base_prompt = load_prompt("support")
-        system_prompt = base_prompt.format(context=context)
+        system_prompt = self._fill_prompt(
+            base_prompt, query=query, context=context, candidates=candidates_text
+        )
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
@@ -301,6 +322,7 @@ class LLMService:
         self,
         query: str,
         chunks: list[RetrievedChunk],
+        reference_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
         """Handle FEEDBACK intent: judge whether the suggestion is covered by KB."""
         s = self._settings
@@ -313,8 +335,11 @@ class LLMService:
             }
 
         context = "\n---\n".join(c.content for c in chunks)
+        candidates_text = self._format_candidates(reference_candidates)
         base_prompt = load_prompt("feedback")
-        system_prompt = self._fill_prompt(base_prompt, query=query, context=context)
+        system_prompt = self._fill_prompt(
+            base_prompt, query=query, context=context, candidates=candidates_text
+        )
 
         raw = await self._call_deepseek(query, [], system_prompt)
 
@@ -328,17 +353,52 @@ class LLMService:
 
     # ── Prompt helpers ────────────────────────────────────
     @staticmethod
-    def _fill_prompt(template: str, query: str, context: str) -> str:
-        """Fill a prompt template supporting ``{query}/{context}`` and
+    def _fill_prompt(
+        template: str, query: str, context: str, candidates: str | None = None
+    ) -> str:
+        """Fill a prompt template supporting ``{query}/{context}/{candidates}`` and
         ``%S/%s/%`` placeholder styles (both are used across admin prompts).
         """
-        # 1) Python str.format: expands {{ }} escapes and {query}/{context}
-        text = template.format(query=query, context=context)
+        # 1) Python str.format: expands {{ }} escapes and {query}/{context}/{candidates}
+        text = template.format(
+            query=query, context=context, candidates=candidates or "（无明确指代对象）"
+        )
         # 2) Legacy %-style placeholders used by the FEEDBACK prompt:
         text = text.replace("%S", context).replace("%s", query)
         # 3) Bare '%' marker for knowledge section (must run after %S/%s)
         text = text.replace("%", context)
         return text
+
+    @staticmethod
+    def _format_candidates(candidates: list[dict] | None) -> str:
+        """将 reference_candidates 格式化为 Prompt 可用的文本。
+
+        多候选时逐条列出 target / attributes / confidence，方便 LLM
+        分别解释每个对象的价值。
+        """
+        if not candidates:
+            return "（无明确指代对象）"
+
+        lines: list[str] = []
+        for idx, cand in enumerate(candidates, 1):
+            target = cand.get("target", "未知")
+            attrs = cand.get("attributes", {})
+            confidence = cand.get("confidence", 0)
+            if not isinstance(attrs, dict):
+                attrs = {}
+            attr_str = "，".join(
+                f"{k}: {v}" for k, v in attrs.items() if v is not None
+            )
+            try:
+                conf_pct = f"{float(confidence):.0%}"
+            except (TypeError, ValueError):
+                conf_pct = "未知"
+            line = f"{idx}. {target}"
+            if attr_str:
+                line += f"（{attr_str}）"
+            line += f"，置信度: {conf_pct}"
+            lines.append(line)
+        return "\n".join(lines)
 
     @staticmethod
     def _extract_json_content(raw: str, max_chars: int = 800) -> str:
