@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { TraceDetail, LogNode } from "../../types";
+import { copyText, jsonStringifyPretty } from "../../utils/clipboard";
+import { Toast } from "../../components/UI/Toast";
 
 interface TraceDrawerProps {
   trace: TraceDetail | null;
@@ -90,11 +92,68 @@ function RetrievalNodeDetail({ node }: { node: LogNode }) {
   );
 }
 
+// ── Copy helpers ────────────────────────────────────────
+function buildNodeJson(node: LogNode): string {
+  return jsonStringifyPretty({
+    node: node.node,
+    service: node.service,
+    duration_ms: node.duration_ms,
+    status: node.status,
+    input: node.input_data,
+    output: node.output_data,
+  });
+}
+
+function buildTraceMarkdown(trace: TraceDetail): string {
+  const parts: string[] = [];
+  parts.push("# 链路详情");
+  parts.push(`trace_id: ${trace.trace_id}`);
+  parts.push("");
+  for (const node of trace.nodes) {
+    parts.push(`## ${node.node}`);
+    parts.push(`服务: ${node.service} | 耗时: ${node.duration_ms} ms | 状态: ${node.status}`);
+    parts.push("");
+    parts.push("### 输入");
+    parts.push("```json");
+    parts.push(jsonStringifyPretty(node.input_data));
+    parts.push("```");
+    parts.push("");
+    parts.push("### 输出");
+    parts.push("```json");
+    parts.push(jsonStringifyPretty(node.output_data));
+    parts.push("```");
+    parts.push("");
+  }
+  return parts.join("\n");
+}
+
 export function TraceDrawer({ trace, onClose }: TraceDrawerProps) {
+  const [toast, setToast] = useState<string | null>(null);
+  const [copyingAll, setCopyingAll] = useState(false);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(null);
+    // 用 rAF 确保 Toast 组件重新挂载，连续点击也能触发动画
+    requestAnimationFrame(() => setToast(msg));
+  }, []);
+
   if (!trace) return null;
+
+  const handleCopyAll = async () => {
+    setCopyingAll(true);
+    const ok = await copyText(buildTraceMarkdown(trace));
+    setCopyingAll(false);
+    showToast(ok ? "已复制全部链路" : "复制失败，请手动复制");
+  };
+
+  const handleCopyNode = async (node: LogNode) => {
+    const ok = await copyText(buildNodeJson(node));
+    showToast(ok ? `已复制 ${node.node} 节点` : "复制失败，请手动复制");
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
+      <Toast message={toast} onDismiss={() => setToast(null)} />
       <div
         className="absolute inset-0 bg-black/30"
         onClick={onClose}
@@ -106,12 +165,21 @@ export function TraceDrawer({ trace, onClose }: TraceDrawerProps) {
             <h2 className="text-lg font-bold text-gray-800">链路详情</h2>
             <p className="text-xs text-gray-500 mt-1">trace_id: {trace.trace_id}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyAll}
+              disabled={copyingAll}
+              className="px-3 py-1.5 rounded-button bg-coral hover:bg-coral-hover text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+            >
+              {copyingAll ? "复制中..." : "⧉ 复制全部"}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="p-5 space-y-4">
@@ -124,13 +192,22 @@ export function TraceDrawer({ trace, onClose }: TraceDrawerProps) {
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-coral/10 text-coral">
                   {node.node}
                 </span>
-                <span
-                  className={`text-xs font-semibold ${
-                    node.status === "ok" ? "text-green-600" : "text-red-500"
-                  }`}
-                >
-                  {node.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs font-semibold ${
+                      node.status === "ok" ? "text-green-600" : "text-red-500"
+                    }`}
+                  >
+                    {node.status}
+                  </span>
+                  <button
+                    onClick={() => handleCopyNode(node)}
+                    className="text-xs px-2 py-1 rounded-button text-gray-500 border border-gray-200 hover:bg-coral/10 hover:text-coral hover:border-coral/30 transition-colors"
+                    title={`复制 ${node.node} 节点`}
+                  >
+                    ⧉ 复制
+                  </button>
+                </div>
               </div>
               <div className="text-sm text-gray-600 mb-2">
                 <span className="font-semibold">服务:</span> {node.service}
