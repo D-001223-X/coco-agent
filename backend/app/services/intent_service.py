@@ -44,6 +44,7 @@ class IntentResult:
     resolved_question: str
     reason: str
     related_sections: list[str] | None = None
+    reference_candidates: list[dict] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -117,13 +118,25 @@ SYSTEM_PROMPT = """\
   "confidence": 0.0到1.0之间的浮点数,
   "resolved_question": "消解指代后的完整问题",
   "reason": "简要说明为什么判断为该意图",
-  "related_sections": ["知识库中与问题相关的章节标题数组，无匹配时为空数组"]
+  "related_sections": ["知识库中与问题相关的章节标题数组，无匹配时为空数组"],
+  "reference_candidates": [
+    {
+      "target": "指代对象名称",
+      "attributes": {"key": "value"},
+      "confidence": 0.0到1.0之间的浮点数
+    }
+  ]
 }
 
 related_sections 说明：
 - 从知识库章节标题中识别与用户问题最相关的 1-3 个章节（如"五、会员与付费方案"、"六、使用指南"）。
 - 如果无法确定对应章节，输出空数组 []。
 - 该字段用于限定检索范围，提高检索精度。
+
+reference_candidates 说明：
+- 用户使用代词（"他/她/它/这个/那个"）或模糊表达（"太贵了/有点贵/怎么用"）时，输出可能的指代对象及其置信度。
+- 无指代或无法确定时输出空数组 []。
+- 详见"五、多目标指代候选规则"。
 
 confidence 评分标准：
 - 0.9-1.0：意图非常明确，无歧义
@@ -133,6 +146,35 @@ confidence 评分标准：
 
 注意：CHAT 类型的 confidence 不要高于 0.6，以防止将误判的闲聊导向跳过知识库检索。
 当用户问题涉及产品信息（如创始团队、公司背景、技术细节、服务器等），即使知识库中暂无相关信息，也应归类为 SUPPORT 而非 CHAT。
+
+## 五、多目标指代候选规则
+
+当用户使用代词（如"他"、"这个"、"那个"）或模糊表达（如"有点贵"、"太贵了"）时：
+
+1. 如果对话历史中只存在一个明确的指代对象 → reference_candidates 只输出该对象，confidence ≥ 0.9
+2. 如果对话历史中存在多个可能的指代对象 → 在 reference_candidates 中列出所有可能对象及其置信度（按相关性排序）
+3. 如果无法确定任何指代对象 → reference_candidates 输出空数组 []
+
+示例 1（多个候选）：
+对话历史：
+- 用户："会员多少钱" → 系统："基础会员68元/月，大会员168元/月"
+- 用户："他这么贵啊"
+输出 reference_candidates：
+[
+  {"target": "基础会员", "attributes": {"price": "68元/月"}, "confidence": 0.30},
+  {"target": "大会员", "attributes": {"price": "168元/月"}, "confidence": 0.60}
+]
+
+示例 2（单个候选）：
+对话历史：
+- 用户："基础会员包含哪些权益" → 系统："包含无限对话时长、全部角色扮演场景..."
+- 用户："他多少钱"
+输出 reference_candidates：
+[{"target": "基础会员", "attributes": {"price": "68元/月"}, "confidence": 0.95}]
+
+示例 3（无候选）：
+用户："有点贵啊"（无对话历史）
+输出 reference_candidates：[]
 """
 # MARKER: INTENT_PROMPT_END
 
@@ -311,10 +353,33 @@ class IntentService:
         if not isinstance(related, list):
             related = None
 
+        # 多目标指代候选：list[{"target": str, "attributes": dict, "confidence": float}]
+        # 向后兼容：LLM 未输出时保持 None，格式异常时置 None 不报错
+        reference_candidates = data.get("reference_candidates")
+        if isinstance(reference_candidates, list):
+            cleaned: list[dict] = []
+            for cand in reference_candidates:
+                if not isinstance(cand, dict):
+                    continue
+                entry: dict = {}
+                if isinstance(cand.get("target"), str):
+                    entry["target"] = cand["target"]
+                if isinstance(cand.get("attributes"), dict):
+                    entry["attributes"] = cand["attributes"]
+                conf = cand.get("confidence")
+                if isinstance(conf, (int, float)) and 0 <= conf <= 1:
+                    entry["confidence"] = float(conf)
+                if entry:
+                    cleaned.append(entry)
+            reference_candidates = cleaned or None
+        else:
+            reference_candidates = None
+
         return IntentResult(
             intent=intent,
             confidence=float(confidence),
             resolved_question=str(resolved),
             reason=str(reason),
             related_sections=related,
+            reference_candidates=reference_candidates,
         )
