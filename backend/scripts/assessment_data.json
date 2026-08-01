@@ -1,0 +1,71 @@
+{
+  "sections": [
+    {
+      "section": "listening",
+      "title": "听力理解",
+      "description": "听对话内容回答问题",
+      "questions": [
+        {"id": "l1", "type": "multiple_choice", "text": "男人说\"Good morning. My name is Tom. I'm from London.\" 问题：这个男人叫什么名字？", "options": ["Mike", "Tom", "John"], "correct_answer": "Tom"},
+        {"id": "l2", "type": "multiple_choice", "text": "女人说\"I would like a cup of coffee, please.\" 问题：这个女人想要什么？", "options": ["Tea", "Coffee", "Juice"], "correct_answer": "Coffee"},
+        {"id": "l3", "type": "multiple_choice", "text": "男人说\"The book is on the table.\" 问题：书在哪里？", "options": ["On the chair", "On the table", "Under the bed"], "correct_answer": "On the table"},
+        {"id": "l4", "type": "multiple_choice", "text": "女人说\"I have two children, a boy and a girl.\" 问题：这个女人有几个孩子？", "options": ["One", "Two", "Three"], "correct_answer": "Two"},
+        {"id": "l5", "type": "multiple_choice", "text": "男人说\"It's 3 o'clock. Time to go home.\" 问题：现在几点了？", "options": ["2:00", "3:00", "4:00"], "correct_answer": "3:00"},
+        {"id": "l6", "type": "multiple_choice", "text": "男人说\"I usually go to work by bus, but today I'm walking because the bus is late.\" 问题：这个男人通常怎么去上班？", "options": ["By car", "By bus", "On foot"], "correct_answer": "By bus"},
+        {"id": "l7", "type": "multiple_choice", "text": "女人说\"Can you buy some milk and bread on your way home?\" 问题：女人想让男人买什么？", "options": ["Milk and bread", "Eggs and milk", "Bread and eggs"], "correct_answer": "Milk and bread"},
+        {"id": "l8", "type": "multiple_choice", "text": "男人说\"I enjoy playing tennis on weekends with my friends.\" 问题：男人什么时候打网球？", "options": ["On weekdays", "On weekends", "Every day"], "correct_answer": "On weekends"},
+        {"id": "l9", "type": "multiple_choice", "text": "女人说\"The restaurant opens at 6:30 PM and closes at 10:00 PM.\" 问题：餐厅什么时候关门？", "options": ["6:30 PM", "8:00 PM", "10:00 PM"], "correct_answer": "10:00 PM"},
+        {"id": "l10", "type": "multiple_choice", "text": "男人说\"I have a headache, so I'm going to take some medicine.\" 问题：男人怎么了？", "options": ["He has a fever", "He has a headache", "He has a stomachache"], "correct_answer": "He has a headache"},
+        {"id": "l11", "type": "multiple_choice", "text": "女人说\"I've been learning English for about three years.\" 问题：这个女人学英语多久了？", "options": ["One year", "Two years", "Three years"], "correct_answer": "Three years"},
+        {"id": "l12", "type": "multiple_choice", "text": "男人说\"If the weather is nice this weekend, we could go to the beach.\" 问题：天气好的话他们会做什么？", "options": ["Stay home", "Go to the beach", "Watch a movie"], "correct_answer": "Go to the beach"},
+        {"id": "l13", "type": "multiple_choice", "text": "女人说\"I prefer to shop online because it's more convenient.\" 问题：女人为什么喜欢网购？", "options": ["It's more convenient", "It's faster", "It's more fun"], "correct_answer": "It's more convenient"},
+        {"id": "l14", "type": "multiple_choice", "text": "男人说\"The company is looking for someone with at least five years of experience.\" 问题：公司要求几年的工作经验？", "options": ["Three years", "Five years", "Ten years"], "correct_answer": "Five years"},
+        {"id": "l15", "type": "multiple_choice", "text": "女人说\"Although I was tired, I decided to finish the report before going to bed.\" 问题：女人什么时候做完报告？", "options": ["Before going to bed", "After going to bed", "In the morning"], "correct_answer": "Before going to bed"},
+        {"id": "l16", "type": "multiple_choice", "text": "男人说\"The government has announced plans to build a new hospital in the city center.\" 问题：政府计划建什么？", "options": ["A school", "A hospital", "A park"], "correct_answer": "A hospital"},
+        {"id": "l17", "type": "multiple_choice", "text": "女人说\"What I find most challenging about learning a new language is not the grammar, but actually having the confidence to speak.\" 问题：女人觉得学语言最难的是什么？", "options": ["Grammar", "Confidence to speak", "Vocabulary"], "correct_answer": "Confidence to speak"},
+        {"id": "l18", "type": "multiple_choice", "text": "男人说\"The lecture was supposed to start at 9, but we began half an hour late.\" 问题：演讲几点开始的？", "options": ["9:00", "9:15", "9:30"], "correct_answer": "9:30"},
+        {"id": "l19", "type": "multiple_choice", "text": "女人说\"The company managed to increase its market share by focusing on innovation and customer service.\" 问题：公司如何增加市场份额？", "options": ["By lowering prices", "By focusing on innovation and customer service", "By hiring more staff"], "correct_answer": "By focusing on innovation and customer service"},
+        {"id": "l20", "type": "multiple_choice", "text": "男人说\"The professor suggested that we read the first three chapters before the next class.\" 问题：教授建议读几章？", "options": ["One chapter", "Two chapters", "Three chapters"], "correct_answer": "Three chapters"}
+      ]
+    },
+    {
+      "section": "speaking",
+      "title": "口语表达",
+      "description": "根据提示进行口语表达（文字输入）",
+      "questions": [
+        {"id": "s1", "type": "text", "text": "请用英语自我介绍（姓名、年龄、国籍）", "options": [], "correct_answer": null},
+        {"id": "s2", "type": "text", "text": "请说出你所在城市的3个地点（如学校、医院、公园）", "options": [], "correct_answer": null},
+        {"id": "s3", "type": "text", "text": "请用英语描述你今天的早餐", "options": [], "correct_answer": null},
+        {"id": "s4", "type": "text", "text": "请说出你最喜欢的颜色并用英语表达", "options": [], "correct_answer": null},
+        {"id": "s5", "type": "text", "text": "请描述你的家庭成员（至少3人）", "options": [], "correct_answer": null},
+        {"id": "s6", "type": "text", "text": "请用英语描述你上个周末做了什么", "options": [], "correct_answer": null},
+        {"id": "s7", "type": "text", "text": "请说出你最喜欢的食物并说明原因", "options": [], "correct_answer": null},
+        {"id": "s8", "type": "text", "text": "请描述你住的房子或公寓", "options": [], "correct_answer": null},
+        {"id": "s9", "type": "text", "text": "请用英语介绍一个你喜欢的节日并说明为什么喜欢", "options": [], "correct_answer": null},
+        {"id": "s10", "type": "text", "text": "请描述一次你难忘的旅行经历", "options": [], "correct_answer": null},
+        {"id": "s11", "type": "text", "text": "请用英语说明你每天的学习/工作安排", "options": [], "correct_answer": null},
+        {"id": "s12", "type": "text", "text": "请说出一个你想去旅行的地方并说明原因", "options": [], "correct_answer": null},
+        {"id": "s13", "type": "text", "text": "请用英语讨论：科技对现代生活的影响", "options": [], "correct_answer": null},
+        {"id": "s14", "type": "text", "text": "请用英语表达你对\"远程办公\"的看法", "options": [], "correct_answer": null},
+        {"id": "s15", "type": "text", "text": "请用英语描述一个你曾经面对的挑战并说明你是如何应对的", "options": [], "correct_answer": null}
+      ]
+    },
+    {
+      "section": "reading",
+      "title": "阅读理解",
+      "description": "阅读短文后回答问题",
+      "questions": [
+        {"id": "r1", "type": "multiple_choice", "text": "阅读：\"My name is Anna. I am 25. I live in New York.\" 问题：Anna住在哪里？", "options": ["London", "New York", "Paris"], "correct_answer": "New York"},
+        {"id": "r2", "type": "multiple_choice", "text": "阅读：\"Tom has a dog. The dog's name is Max.\" 问题：Tom有什么宠物？", "options": ["A cat", "A dog", "A bird"], "correct_answer": "A dog"},
+        {"id": "r3", "type": "multiple_choice", "text": "阅读：\"The shop opens at 9 and closes at 6.\" 问题：商店几点开门？", "options": ["8", "9", "10"], "correct_answer": "9"},
+        {"id": "r4", "type": "multiple_choice", "text": "阅读：\"I like apples. I don't like oranges.\" 问题：这个人喜欢什么？", "options": ["Oranges", "Apples", "Bananas"], "correct_answer": "Apples"},
+        {"id": "r5", "type": "multiple_choice", "text": "阅读：\"Sarah works in a hospital. She is a nurse.\" 问题：Sarah做什么工作？", "options": ["A teacher", "A nurse", "A doctor"], "correct_answer": "A nurse"},
+        {"id": "r6", "type": "multiple_choice", "text": "阅读：\"There are four seasons. I like summer because I can go swimming.\" 问题：作者为什么喜欢夏天？", "options": ["Because he can go swimming", "Because it's cold", "Because he can ski"], "correct_answer": "Because he can go swimming"},
+        {"id": "r7", "type": "multiple_choice", "text": "阅读：\"Many people enjoy traveling to other countries. When you travel, you can learn about different cultures.\" 问题：人们为什么喜欢旅行？", "options": ["To learn about cultures", "To spend money", "To stay home"], "correct_answer": "To learn about cultures"},
+        {"id": "r8", "type": "multiple_choice", "text": "阅读：\"Many people enjoy traveling. However, traveling can also be expensive.\" 问题：旅行的缺点是什么？", "options": ["It's boring", "It's expensive", "It's dangerous"], "correct_answer": "It's expensive"},
+        {"id": "r9", "type": "multiple_choice", "text": "阅读：\"Scientists agree that human activities are contributing to global warming.\" 问题：气候变化的主要原因是什么？", "options": ["Natural disasters", "Human activities", "Animal behavior"], "correct_answer": "Human activities"},
+        {"id": "r10", "type": "multiple_choice", "text": "阅读：\"Many countries are investing in renewable energy sources like solar and wind power.\" 问题：许多国家正在投资什么？", "options": ["Fossil fuels", "Renewable energy", "Nuclear power"], "correct_answer": "Renewable energy"},
+        {"id": "r11", "type": "multiple_choice", "text": "阅读：\"To reduce the impact, many countries are investing in renewable energy sources like solar and wind power.\" 问题：文中提到的可再生能源有哪些？", "options": ["Solar and wind", "Coal and gas", "Oil and nuclear"], "correct_answer": "Solar and wind"}
+      ]
+    }
+  ]
+}
