@@ -92,3 +92,60 @@ export async function generateLearningPlan(
   );
   return data.data;
 }
+
+// ── Session API (T-004) ──────────────────────────────────
+export interface PracticeMode {
+  id: "roleplay" | "freechat" | "topic";
+  label: string;
+  icon: string;
+  description: string;
+  scenarios: string[];
+}
+
+export interface Correction {
+  original: string;
+  corrected: string;
+  type: "grammar" | "vocabulary" | "pronunciation";
+}
+
+export interface ChatResponse {
+  reply: string;
+  correction: Correction | null;
+  agentThought: string | null;
+  decision: string | null;
+  roundId: string;
+}
+
+export async function getPracticeModes(): Promise<PracticeMode[]> {
+  const { data } = await client.get<ApiResp<{ modes: PracticeMode[] }>>(
+    "/practice/modes"
+  );
+  return data.data.modes;
+}
+
+export async function startPracticeSession(params: {
+  mode: string;
+  scenario: string;
+  userLevel: string;
+  userId: string;
+}): Promise<{ sessionId: string; agentGreeting: string }> {
+  const { data } = await client.post<
+    ApiResp<{ sessionId: string; agentGreeting: string }>
+  >("/practice/session/start", params);
+  return data.data;
+}
+
+export async function sendPracticeChat(
+  sessionId: string,
+  message: string
+): Promise<ChatResponse> {
+  const { data } = await client.post<ApiResp<ChatResponse>>(
+    "/practice/session/chat",
+    { sessionId, message }
+  );
+  return data.data;
+}
+
+export async function endPracticeSession(sessionId: string): Promise<void> {
+  await client.post("/practice/session/end", { sessionId });
+}

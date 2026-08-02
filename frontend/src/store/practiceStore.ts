@@ -3,18 +3,25 @@ import {
   getAssessmentQuestions,
   submitAssessmentAnswers,
   generateLearningPlan,
+  getPracticeModes,
+  startPracticeSession,
+  sendPracticeChat,
+  endPracticeSession,
 } from "../api/practice";
 import type {
   PracticeQuestion,
   AssessmentResult,
   LearningPlan,
   UserGoals,
+  PracticeMode,
+  Correction,
 } from "../api/practice";
 
 // ── localStorage keys ────────────────────────────────────
 const ASSESSMENT_KEY = "assessment";
 const PLAN_KEY = "learningPlan";
 const GOALS_KEY = "learningGoals";
+const SESSION_KEY = "practiceSession";
 
 // ── Flatten questions with their section ─────────────────
 export interface FlatQuestion extends PracticeQuestion {
@@ -32,13 +39,31 @@ interface PracticeState {
   goals: UserGoals | null;
   plan: LearningPlan | null;
   generating: boolean;
+  // ── 会话状态（T-004）──
+  modes: PracticeMode[];
+  sessionId: string | null;
+  chatMessages: ChatMessage[];
+  chatting: boolean;
   // actions
   loadQuestions: () => Promise<void>;
   setAnswer: (id: string, value: string) => void;
   submitAssessment: () => Promise<void>;
   setGoals: (g: UserGoals) => void;
   generatePlan: (userId: string) => Promise<void>;
+  loadModes: () => Promise<void>;
+  startSession: (mode: string, scenario: string, userLevel: string, userId: string) => Promise<string | null>;
+  sendChat: (message: string) => Promise<void>;
+  endSession: () => Promise<void>;
   reset: () => void;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "agent";
+  content: string;
+  correction?: Correction | null;
+  agentThought?: string | null;
+  timestamp: string;
 }
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
@@ -51,6 +76,10 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   goals: null,
   plan: null,
   generating: false,
+  modes: [],
+  sessionId: null,
+  chatMessages: [],
+  chatting: false,
 
   loadQuestions: async () => {
     set({ loading: true, error: "" });
@@ -138,6 +167,91 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       assessmentResult: null,
       error: "",
     }),
+
+  // ── 会话 actions（T-004）──────────────────────────────
+  loadModes: async () => {
+    try {
+      const modes = await getPracticeModes();
+      set({ modes });
+    } catch (e) {
+      set({ error: "模式加载失败" });
+    }
+  },
+
+  startSession: async (mode, scenario, userLevel, userId) => {
+    set({ chatting: true, error: "" });
+    try {
+      const { sessionId, agentGreeting } = await startPracticeSession({
+        mode,
+        scenario,
+        userLevel,
+        userId,
+      });
+      const greeting: ChatMessage = {
+        id: `round_${Date.now()}`,
+        role: "agent",
+        content: agentGreeting,
+        correction: null,
+        agentThought: null,
+        timestamp: new Date().toISOString(),
+      };
+      localStorage.setItem(SESSION_KEY, sessionId);
+      set({ sessionId, chatMessages: [greeting], chatting: false });
+      return sessionId;
+    } catch (e) {
+      set({ chatting: false, error: "会话启动失败，请重试" });
+      return null;
+    }
+  },
+
+  sendChat: async (message) => {
+    const sessionId = get().sessionId;
+    if (!sessionId) {
+      set({ error: "会话未启动" });
+      return;
+    }
+    const userMsg: ChatMessage = {
+      id: `round_${Date.now()}`,
+      role: "user",
+      content: message,
+      timestamp: new Date().toISOString(),
+    };
+    set((state) => ({
+      chatting: true,
+      error: "",
+      chatMessages: [...state.chatMessages, userMsg],
+    }));
+    try {
+      const res = await sendPracticeChat(sessionId, message);
+      const agentMsg: ChatMessage = {
+        id: res.roundId,
+        role: "agent",
+        content: res.reply,
+        correction: res.correction,
+        agentThought: res.agentThought,
+        timestamp: new Date().toISOString(),
+      };
+      set((state) => ({
+        chatting: false,
+        chatMessages: [...state.chatMessages, agentMsg],
+      }));
+    } catch (e) {
+      set({ chatting: false, error: "回复失败，请重试" });
+    }
+  },
+
+  endSession: async () => {
+    const sessionId = get().sessionId;
+    if (sessionId) {
+      try {
+        await endPracticeSession(sessionId);
+      } catch (e) {
+        // 忽略结束失败
+      }
+    }
+    localStorage.removeItem(SESSION_KEY);
+    set({ sessionId: null, chatMessages: [] });
+  },
 }));
 
 // ── 读取持久化数据（供页面初始化）────────────────────────
