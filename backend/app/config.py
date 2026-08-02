@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # ── Database ────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///./coco.db"
     # CloudBase 数据库切换（T-mobile 部署）：USE_CLOUD_DB=true 时优先用云端连接串
+    # CloudBase 云数据库 URL 格式示例：
+    #   mysql+aiomysql://user:pass@host:port/dbname?charset=utf8mb4
     use_cloud_db: bool = False
     cloudbase_database_url: str | None = None
 

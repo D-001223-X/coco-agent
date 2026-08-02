@@ -4,11 +4,14 @@ No business logic here — only registration, configuration, and startup.
 """
 
 import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.config import get_settings
 from app.routers import auth, chat, logs, sessions
 from app.routers.admin import bad_cases as admin_bad_cases
 from app.routers.admin import config as admin_config
@@ -24,10 +27,39 @@ from app.routers.practice import session as practice_session
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """启动时初始化数据库 + 确保知识库索引存在（云函数冷启动兜底）。
+
+    - init_db：建表 + 默认 admin（SQLite 下含 FTS5，MySQL 自动跳过）
+    - FAISS 索引缺失时自动重建（部署时 .index/.json 可能未打包）
+    """
+    s = get_settings()
+    try:
+        from app.database import init_db
+        await init_db()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("init_db failed at startup: %s", exc)
+
+    try:
+        faiss_path = Path(s.faiss_index_path)
+        chunks_path = Path(s.chunks_meta_path)
+        if not faiss_path.exists() or not chunks_path.exists():
+            logger.info("Knowledge index missing → rebuilding...")
+            from scripts.build_index import main as build_main
+            await build_main()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Knowledge index build failed at startup: %s", exc)
+
+    yield
+
+
 app = FastAPI(
     title="可可语伴AI客服系统",
     description="基于RAG架构的智能客服API",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # ── CORS (restrict to known front-end origins) ─────────────

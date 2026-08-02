@@ -2,8 +2,13 @@
 
 Ensures:
   • ORM tables created via SQLAlchemy ``create_all``.
-  • FTS5 virtual table ``knowledge_fts`` created via raw SQL.
+  • FTS5 virtual table ``knowledge_fts`` created via raw SQL (SQLite only).
   • Default admin account inserted (bcrypt-hashed, idempotent).
+
+Database backends:
+  • SQLite (local dev / tests): aiosqlite + FTS5 full-text index.
+  • MySQL / CloudBase 云数据库 (production): aiomysql, no FTS5 —
+    retrieval falls back to FAISS vectors + Python keyword matching.
 """
 
 from __future__ import annotations
@@ -43,11 +48,23 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        _engine = create_async_engine(
-            get_settings().effective_database_url,
-            echo=False,
-        )
+        url = get_settings().effective_database_url
+        kwargs: dict[str, Any] = {"echo": False}
+        # MySQL/CloudBase 云数据库：连接池 + utf8mb4（emoji/多字节安全）
+        if url.startswith("mysql"):
+            kwargs.update({
+                "pool_size": 5,
+                "max_overflow": 10,
+                "pool_recycle": 3600,
+                "pool_pre_ping": True,
+            })
+        _engine = create_async_engine(url, **kwargs)
     return _engine
+
+
+def is_sqlite_url(url: str) -> bool:
+    """判断是否 SQLite（决定是否创建 FTS5 虚拟表）。"""
+    return url.startswith("sqlite")
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
@@ -96,12 +113,16 @@ async def init_db(database_url: str | None = None) -> None:
     else:
         engine = get_engine()
 
+    is_sqlite = is_sqlite_url(database_url or get_settings().effective_database_url)
+
     # ── 1. ORM tables ──────────────────────────────────────
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-        # ── 2. FTS5 virtual table ────────────────────────────
-        await conn.execute(_FTS5_SQL)
+        # ── 2. FTS5 virtual table（仅 SQLite）───────────────
+        # MySQL/CloudBase 云数据库无 FTS5：跳过，检索走 FAISS 向量 + Python 关键词。
+        if is_sqlite:
+            await conn.execute(_FTS5_SQL)
 
     # ── 3. Default admin ──────────────────────────────────
     session_factory = async_sessionmaker(engine, expire_on_commit=False)

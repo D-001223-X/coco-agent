@@ -343,7 +343,14 @@ async def populate_fts5(chunks: list[dict], db_url: str) -> None:
     it is only used as a foreign key back to the chunks metadata.
     The virtual table is dropped and recreated so schema changes are applied
     idempotently on every rebuild.
+
+    **SQLite only**: MySQL/CloudBase 云数据库无 FTS5，本函数直接跳过
+    （检索走 FAISS 向量 + Python 关键词匹配）。
     """
+    if not db_url.startswith("sqlite"):
+        print("INFO  populate_fts5 skipped (non-SQLite backend: FTS5 unavailable)")
+        return
+
     engine = create_async_engine(db_url, echo=False)
 
     async with engine.connect() as conn:
@@ -417,7 +424,7 @@ async def main() -> None:
     )
     logger.info("Chunks metadata saved to %s (%d entries)", chunks_path, len(chunks))
 
-    await populate_fts5(chunks, s.database_url)
+    await populate_fts5(chunks, s.effective_database_url)
     logger.info("All artifacts built successfully.")
 
 
