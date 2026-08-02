@@ -16,6 +16,7 @@ from app.routers.admin import knowledge as admin_knowledge
 from app.routers.admin import logs as admin_logs
 from app.routers.admin import params as admin_params
 from app.routers.admin import prompts as admin_prompts
+from app.routers.admin import agent_traces as admin_agent_traces
 from app.routers.practice import assessment as practice_assessment
 from app.routers.practice import plan as practice_plan
 from app.routers.practice import progress as practice_progress
@@ -53,6 +54,7 @@ app.include_router(admin_params.router)
 app.include_router(admin_logs.router)
 app.include_router(admin_bad_cases.router)
 app.include_router(admin_config.router)
+app.include_router(admin_agent_traces.router)
 app.include_router(practice_assessment.router)
 app.include_router(practice_plan.router)
 app.include_router(practice_session.router)

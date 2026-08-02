@@ -184,16 +184,38 @@ class SessionService:
     # ── 对话 ─────────────────────────────────────────────
     async def chat(self, session_id: str, message: str) -> dict[str, Any]:
         """处理用户消息，返回 Agent 回复 + 纠错 + 决策轨迹。"""
+        import time as _time
+
+        from app.utils.logger import log_node
+
         session = self.get_session(session_id)
         if session is None:
             raise KeyError(f"会话不存在: {session_id}")
 
+        trace_id = f"agent_{session_id}_{uuid.uuid4().hex[:8]}"
+
         # Agent 决策层集成：判断走直接回复（SIMPLE_ANSWER）还是深度处理
+        t0 = _time.perf_counter()
         decision = await self._decision_maker.decide(
             query=message,
             intent="PRACTICE",
             confidence=0.9,  # 陪练场景置信度固定偏高（消息都是练习输入）
             context="口语陪练",
+        )
+        log_node(
+            trace_id=trace_id,
+            node="agent_decision",
+            input_data={"query": message, "mode": session.mode, "scenario": session.scenario},
+            output_data={
+                "decision": decision.decision.value,
+                "reason": decision.reason,
+                "confidence": decision.confidence,
+                "fallback_to_workflow": decision.fallback_to_workflow,
+            },
+            duration_ms=int((_time.perf_counter() - t0) * 1000),
+            service="DecisionMaker",
+            user_id=int(session.user_id) if str(session.user_id).isdigit() else None,
+            session_id=session_id,
         )
 
         # 记录用户消息
@@ -207,10 +229,26 @@ class SessionService:
         })
         session.skill.append_history("user", message)
 
-        # Skill 处理
+        # Skill 处理（ReAct 决策轨迹：skill 即 Agent 执行层）
+        t1 = _time.perf_counter()
         result = await session.skill.process_user_input(message)
         reply = result.get("reply", "")
         correction = result.get("correction")
+
+        log_node(
+            trace_id=trace_id,
+            node="react_loop",
+            input_data={"query": message, "skill": session.mode, "user_level": session.user_level},
+            output_data={
+                "reply": reply,
+                "correction": correction,
+                "agentThought": result.get("agentThought"),
+            },
+            duration_ms=int((_time.perf_counter() - t1) * 1000),
+            service=f"Skill[{session.mode}]",
+            user_id=int(session.user_id) if str(session.user_id).isdigit() else None,
+            session_id=session_id,
+        )
 
         # 记录 Agent 回复
         round_id = f"round_{uuid.uuid4().hex[:8]}"
