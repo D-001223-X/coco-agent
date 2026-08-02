@@ -16,6 +16,7 @@ import type {
   UserGoals,
   PracticeMode,
   Correction,
+  ReactLoopStep,
 } from "../api/practice";
 
 // ── localStorage keys ────────────────────────────────────
@@ -67,6 +68,8 @@ export interface ChatMessage {
   content: string;
   correction?: Correction | null;
   agentThought?: string | null;
+  reactLoop?: ReactLoopStep[];
+  naturalSummary?: string;
   timestamp: string;
 }
 
@@ -241,6 +244,8 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         content: res.reply,
         correction: res.correction,
         agentThought: res.agentThought,
+        reactLoop: res.react_loop,
+        naturalSummary: res.naturalSummary,
         timestamp: new Date().toISOString(),
       };
       set((state) => ({

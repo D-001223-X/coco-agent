@@ -121,10 +121,20 @@ export interface Correction {
   type: "grammar" | "vocabulary" | "pronunciation";
 }
 
+export interface ReactLoopStep {
+  step: number;
+  thought: string;
+  action: string;
+  action_input: unknown;
+  observation: string;
+}
+
 export interface ChatResponse {
   reply: string;
   correction: Correction | null;
   agentThought: string | null;
+  react_loop?: ReactLoopStep[];
+  naturalSummary?: string;
   decision: string | null;
   roundId: string;
 }
