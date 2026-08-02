@@ -35,7 +35,10 @@ async def setup_db(tmp_path):
     chunks: list[dict] = []
     for md_file in md_files:
         md_text = md_file.read_text(encoding="utf-8")
-        chunks.extend(chunk_markdown(md_text))
+        # 与 build_index 一致：传文件名前缀保证 chunk_id 全局唯一
+        for c in chunk_markdown(md_text, id_prefix=md_file.name):
+            c["source_file"] = md_file.name
+            chunks.append(c)
 
     # Build FAISS index + chunks.json in tmp_path
     index, _ = build_faiss_index(chunks)

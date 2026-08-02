@@ -64,6 +64,25 @@ def _ngram_hash(text: str, n: int, dim: int = VECTOR_DIM) -> list[int]:
     return buckets
 
 
+def _split_chinese_query(query: str, window: int = 4) -> list[str]:
+    """将中文查询拆分为滑动窗口子串（长度 2..window），提升 FTS5/关键词命中率。
+
+    例：query="会员多少钱" → ["会员", "员多", "多少", "少钱", "会员多", "员多少", "多少钱", ...]
+
+    注意：窗口太短会产生噪声（如"员多"），因此去重并按长度降序排列，
+    使较长、更具体的子串优先参与 FTS5 匹配。
+    """
+    tokens: set[str] = set()
+    n = len(query)
+    for w in range(2, min(window, n) + 1):
+        for i in range(n - w + 1):
+            tokens.add(query[i : i + w])
+    # 保留原句作为最精确匹配
+    tokens.add(query)
+    # 排序：长度降序 → 保持确定性
+    return sorted(tokens, key=lambda t: (-len(t), t))
+
+
 def text_to_vector(text: str, dim: int = VECTOR_DIM) -> np.ndarray:
     vec = np.zeros(dim, dtype=np.float32)
     for n in (2, 3, 4):
@@ -372,11 +391,20 @@ class RetrievalService:
     async def _fts5_search(
         self, query: str, k: int, sections: list[str] | None = None
     ) -> list[tuple[str, str, float, str]]:
+        # 确保 chunks 元数据已加载（fallback 需要；独立调用时可能未加载）
+        if self._chunks is None:
+            await asyncio.to_thread(self._load_index)
+
         session_factory = get_session_factory()
 
         tokens = [t for t in query.replace("'", "''").split() if t]
         if not tokens:
             tokens = list(query)
+        # 中文场景：FTS5 unicode61 无法对连续中文分词，整句精确匹配往往无结果。
+        # 拆分为子串 tokens（2-4 字符滑动窗口），提升命中率。
+        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in query)
+        if has_cjk:
+            tokens = _split_chinese_query(query)
 
         fts_query = " OR ".join(f'"{t}"' for t in tokens)
 
@@ -388,9 +416,18 @@ class RetrievalService:
             LIMIT :k
         """)
 
-        async with session_factory() as session:
-            result = await session.execute(sql, {"q": fts_query, "k": k})
-            rows = result.fetchall()
+        try:
+            async with session_factory() as session:
+                result = await session.execute(sql, {"q": fts_query, "k": k})
+                rows = result.fetchall()
+        except Exception as exc:
+            # FTS5 MATCH 可能因分词/特殊字符抛错（尤其中文场景），
+            # 降级到 Python 关键词匹配，保证中文检索可用。
+            logger.warning(
+                "[retrieval] FTS5 MATCH failed (query=%r), fallback to keyword: %s",
+                query, exc,
+            )
+            rows = []
 
         logger.debug("[retrieval] FTS5 query=%r tokens=%r rows=%d", query, tokens, len(rows))
 
@@ -428,6 +465,10 @@ class RetrievalService:
         if not self._chunks:
             return []
 
+        # 中文查询：用滑动窗口子串 tokens（与 _fts5_search 一致）
+        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in query)
+        search_tokens = _split_chinese_query(query) if has_cjk else tokens
+
         scored: list[tuple[str, str, float]] = []
         for chunk in self._chunks:
             if sections:
@@ -436,9 +477,10 @@ class RetrievalService:
                     continue
             content = chunk["content"]
             score = 0.0
-            for token in tokens:
+            for token in search_tokens:
                 if token and token in content:
-                    score += 1.0
+                    # 较长 token（更具体）权重更高；短 token 权重低
+                    score += min(len(token), 4) * 0.5
             if score > 0:
                 scored.append((chunk["chunk_id"], content, score))
 

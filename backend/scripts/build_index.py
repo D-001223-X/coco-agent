@@ -200,13 +200,19 @@ def split_faq_pairs(content: str) -> list[tuple[str, str]] | None:
     return None
 
 
-def _split_section_chunks(section: str, content: str, start_id: int) -> list[dict]:
+def _split_section_chunks(
+    section: str, content: str, start_id: int, id_prefix: str = ""
+) -> list[dict]:
     """Split one section block; FAQ blocks get fine-grained QA chunks."""
+
+    def _cid(n: int) -> str:
+        return f"{id_prefix}:{n}" if id_prefix else str(n)
+
     faq_pairs = split_faq_pairs(content)
     if faq_pairs is None:
         # normal block — keep as one chunk
         return [{
-            "chunk_id": str(start_id),
+            "chunk_id": _cid(start_id),
             "content": content,
             "section": section,
         }]
@@ -220,33 +226,43 @@ def _split_section_chunks(section: str, content: str, start_id: int) -> list[dic
     ).strip()
     if heading_line:
         chunks.append({
-            "chunk_id": str(start_id + len(chunks)),
+            "chunk_id": _cid(start_id + len(chunks)),
             "content": heading_line,
             "section": section,
         })
 
     for q, a in faq_pairs:
         chunks.append({
-            "chunk_id": str(start_id + len(chunks)),
+            "chunk_id": _cid(start_id + len(chunks)),
             "content": f"Q: {q}\nA: {a}",
             "section": section,
         })
     return chunks
 
 
-def chunk_markdown(md_text: str) -> list[dict]:
+def chunk_markdown(md_text: str, id_prefix: str = "") -> list[dict]:
     """Split markdown by ## headings, then fine-split FAQ blocks.
 
     Layer 1: split by ``## `` headings into section blocks.
     Layer 2: detect FAQ blocks via ``is_faq_block``.
     Layer 3: fine-split FAQ blocks into (Q, A) chunks via ``split_faq_pairs``.
     Non-FAQ blocks stay as-is.
+
+    Parameters
+    ----------
+    id_prefix : str
+        文件名前缀（如 "cefr_standards.md"），用于生成**全局唯一** chunk_id。
+        多文件合并建索引时若不传前缀，各文件 chunk_id 会从 0 重复，
+        导致 FAISS/FTS5 结果按 chunk_id 融合时互相覆盖（检索污染）。
     """
     lines = md_text.split("\n")
     chunks: list[dict] = []
     section_blocks: list[tuple[str, str]] = []  # (heading, body_with_heading)
     current_heading = ""
     current_lines: list[str] = []
+
+    def _cid(n: int) -> str:
+        return f"{id_prefix}:{n}" if id_prefix else str(n)
 
     for line in lines:
         if line.startswith("## "):
@@ -270,10 +286,10 @@ def chunk_markdown(md_text: str) -> list[dict]:
             ln for ln in body.split("\n") if not ln.strip().startswith("## ")
         )
         if is_faq_block(body_no_heading):
-            chunks.extend(_split_section_chunks(heading, body, len(chunks)))
+            chunks.extend(_split_section_chunks(heading, body, len(chunks), id_prefix))
         else:
             chunks.append({
-                "chunk_id": str(len(chunks)),
+                "chunk_id": _cid(len(chunks)),
                 "content": body,
                 "section": heading,
             })
@@ -377,10 +393,11 @@ async def main() -> None:
         )
 
     # Merge chunks from all .md files; each chunk keeps a source file reference
+    # 传文件名前缀保证 chunk_id 全局唯一（多文件不重复）
     chunks: list[dict] = []
     for md_file in md_files:
         md_text = md_file.read_text(encoding="utf-8")
-        file_chunks = chunk_markdown(md_text)
+        file_chunks = chunk_markdown(md_text, id_prefix=md_file.name)
         for c in file_chunks:
             c["source_file"] = md_file.name
         chunks.extend(file_chunks)
