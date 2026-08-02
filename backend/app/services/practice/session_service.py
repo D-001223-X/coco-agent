@@ -252,12 +252,16 @@ class SessionService:
 
         # 记录 Agent 回复
         round_id = f"round_{uuid.uuid4().hex[:8]}"
+        react_loop = result.get("react_loop") or []
+        natural_summary = _generate_natural_summary(react_loop)
         session.history.append({
             "id": round_id,
             "role": "agent",
             "content": reply,
             "correction": correction,
             "agentThought": result.get("agentThought"),
+            "reactLoop": react_loop,
+            "naturalSummary": natural_summary,
             "timestamp": _now_iso(),
         })
         session.skill.append_history("agent", reply)
@@ -266,9 +270,53 @@ class SessionService:
             "reply": reply,
             "correction": correction,
             "agentThought": result.get("agentThought"),
+            "react_loop": react_loop,
+            "naturalSummary": natural_summary,
             "decision": decision.decision.value,
             "roundId": round_id,
         }
+
+
+def _generate_natural_summary(react_loop: list[dict[str, Any]]) -> str:
+    """将 ReAct 步骤（Thought → Action → Observation）转为自然语言摘要。
+
+    空循环 → “基于已有知识直接回答。”
+    """
+    if not react_loop:
+        return "基于已有知识直接回答。"
+
+    parts: list[str] = []
+    for step in react_loop:
+        thought = str(step.get("thought", "")).strip()
+        action = str(step.get("action", "")).strip()
+        observation = str(step.get("observation", "")).strip()
+
+        if action == "understand_input":
+            if thought:
+                parts.append(f"我分析了用户的表达：{thought}。")
+        elif action == "check_grammar":
+            action_desc = "检查了语法" if "grammar" in action else "检查了用词"
+            parts.append(f"我调用了语法检查工具，{observation}。")
+        elif action == "generate_reply":
+            parts.append("我决定先肯定用户的尝试，再温和给出建议与正确表达。")
+        else:
+            if thought:
+                parts.append(f"我思考道：{thought}。")
+            if observation:
+                parts.append(observation)
+
+    if not parts:
+        return "基于已有知识直接回答。"
+
+    # 多步合并：首先…然后…最后…
+    if len(parts) == 1:
+        return parts[0]
+    body = "首先，" + parts[0]
+    if len(parts) == 2:
+        return body + "然后，" + parts[1]
+    for p in parts[1:-1]:
+        body += "接着，" + p
+    return body + "最后，" + parts[-1]
 
 
 def _now_iso() -> str:

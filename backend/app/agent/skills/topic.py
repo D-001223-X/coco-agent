@@ -67,12 +67,19 @@ class TopicSkill(BaseSkill):
         raw = await self.call_llm(system_prompt, user_message)
         parsed = self.parse_reply(raw)
 
+        reply = parsed["reply"] or "That's an interesting point. Why do you think so?"
+        correction = parsed.get("correction")
+        agent_thought = (
+            f"话题讨论[{cfg['name']}]({cfg['category']})，"
+            f"用户等级{self.user_level}，难度{cfg['difficulty']}，"
+            "按引入→展开→总结结构推进讨论并评价表达"
+        )
+
         return {
-            "reply": parsed["reply"] or "That's an interesting point. Why do you think so?",
-            "correction": parsed.get("correction"),
-            "agentThought": (
-                f"话题讨论[{cfg['name']}]({cfg['category']})，"
-                f"用户等级{self.user_level}，难度{cfg['difficulty']}，"
-                "按引入→展开→总结结构推进讨论并评价表达"
+            "reply": reply,
+            "correction": correction,
+            "agentThought": agent_thought,
+            "react_loop": self.build_react_loop(
+                user_message, reply, correction, agent_thought
             ),
         }

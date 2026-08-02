@@ -63,12 +63,19 @@ class FreeChatSkill(BaseSkill):
         raw = await self.call_llm(system_prompt, user_message)
         parsed = self.parse_reply(raw)
 
+        reply = parsed["reply"] or "Interesting! Tell me more."
+        correction = parsed.get("correction")
+        agent_thought = (
+            f"自由对话[{cfg['name']}]({cfg['category']})，"
+            f"用户等级{self.user_level}，难度{cfg['difficulty']}，"
+            "自然引导话题并轻量纠错"
+        )
+
         return {
-            "reply": parsed["reply"] or "Interesting! Tell me more.",
-            "correction": parsed.get("correction"),
-            "agentThought": (
-                f"自由对话[{cfg['name']}]({cfg['category']})，"
-                f"用户等级{self.user_level}，难度{cfg['difficulty']}，"
-                "自然引导话题并轻量纠错"
+            "reply": reply,
+            "correction": correction,
+            "agentThought": agent_thought,
+            "react_loop": self.build_react_loop(
+                user_message, reply, correction, agent_thought
             ),
         }

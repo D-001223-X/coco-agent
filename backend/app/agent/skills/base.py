@@ -168,3 +168,57 @@ class BaseSkill(ABC):
                     correction = None
                 break
         return {"reply": reply, "correction": correction}
+
+    def build_react_loop(
+        self,
+        user_message: str,
+        reply: str,
+        correction: dict | None,
+        agent_thought: str,
+    ) -> list[dict[str, Any]]:
+        """构造 ReAct 循环步骤（Thought → Action → Observation）。
+
+        每个 Skill 处理后生成完整的推理轨迹，供前端展示与复制。
+        """
+        steps: list[dict[str, Any]] = []
+
+        # Step 1: 理解用户输入
+        steps.append({
+            "step": 1,
+            "thought": f"分析用户输入，识别其表达意图和可能的语言问题",
+            "action": "understand_input",
+            "action_input": {"text": user_message},
+            "observation": f"用户等级 {self.user_level}，场景「{self.scenario}」",
+        })
+
+        if correction:
+            # Step 2: 语法/词汇检查
+            steps.append({
+                "step": 2,
+                "thought": agent_thought or "用户表达存在可优化之处，需要检查语言准确性",
+                "action": "check_grammar",
+                "action_input": {"text": correction.get("original", user_message)},
+                "observation": (
+                    f"发现{correction.get('type', '语法')}问题："
+                    f"「{correction.get('original', '')}」应改为「{correction.get('corrected', '')}」"
+                ),
+            })
+            # Step 3: 生成含纠错的回复
+            steps.append({
+                "step": 3,
+                "thought": "决定先肯定用户的尝试，再温和指出错误并给出正确表达",
+                "action": "generate_reply",
+                "action_input": {"with_correction": True},
+                "observation": f"已生成回复：{reply[:60]}{'...' if len(reply) > 60 else ''}",
+            })
+        else:
+            # Step 2: 直接生成回复
+            steps.append({
+                "step": 2,
+                "thought": agent_thought or "用户表达正确，基于场景直接生成自然回复并继续引导对话",
+                "action": "generate_reply",
+                "action_input": {"with_correction": False},
+                "observation": f"已生成回复：{reply[:60]}{'...' if len(reply) > 60 else ''}",
+            })
+
+        return steps

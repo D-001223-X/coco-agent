@@ -93,6 +93,8 @@ async def chat(req: ChatRequest, _user: UserDep):
             "reply": result["reply"],
             "correction": result.get("correction"),
             "agentThought": result.get("agentThought"),
+            "react_loop": result.get("react_loop"),
+            "naturalSummary": result.get("naturalSummary"),
             "decision": result.get("decision"),
             "roundId": result.get("roundId"),
         },
