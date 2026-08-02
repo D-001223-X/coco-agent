@@ -172,3 +172,56 @@ export async function switchPracticeScenario(
   >("/practice/session/switch", { sessionId, scenario });
   return data.data;
 }
+
+// ── Progress API (T-006) ─────────────────────────────────
+export interface ErrorPattern {
+  type: "grammar" | "vocabulary" | "pronunciation";
+  count: number;
+}
+
+export interface ErrorExample {
+  type: string;
+  original: string;
+  corrected: string;
+}
+
+export interface DailyLog {
+  date: string;
+  sessions: number;
+  rounds: number;
+  corrections: number;
+}
+
+export interface LearningProgress {
+  userId: string;
+  totalDays: number;
+  totalSessions: number;
+  totalRounds: number;
+  totalCorrections: number;
+  strengths: string[];
+  weaknesses: string[];
+  errorPatterns: Record<string, number>;
+  errorExamples: ErrorExample[];
+  dailyLogs: DailyLog[];
+  activeDays7: number;
+  activeDays30: number;
+  updatedAt: string;
+}
+
+export async function fetchLearningProgress(): Promise<LearningProgress> {
+  const { data } = await client.get<ApiResp<LearningProgress>>(
+    "/practice/progress"
+  );
+  return data.data;
+}
+
+export async function generateProgressFeedback(
+  userId: string,
+  userLevel: string
+): Promise<string> {
+  const { data } = await client.post<ApiResp<{ feedback: string }>>(
+    "/practice/progress/feedback",
+    { userId, userLevel }
+  );
+  return data.data.feedback;
+}

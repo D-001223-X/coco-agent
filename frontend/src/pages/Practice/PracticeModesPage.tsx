@@ -52,8 +52,18 @@ export default function PracticeModesPage() {
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">选择陪练模式</h1>
-        <p className="text-sm text-gray-500 text-center mb-8">三种模式，随时开练</p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">选择陪练模式</h1>
+            <p className="text-sm text-gray-500 mt-1">三种模式，随时开练</p>
+          </div>
+          <button
+            onClick={() => navigate("/practice/progress")}
+            className="px-4 py-2 rounded-button text-xs font-semibold text-gray-600 border border-gray-200 hover:text-coral hover:border-coral/40 transition-colors"
+          >
+            📊 学习进度
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {modes.map((mode) => (
