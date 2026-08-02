@@ -1,9 +1,11 @@
 import axios from "axios";
 
-void import.meta.env.VITE_API_BASE_URL;
+// 部署时通过 VITE_API_BASE_URL 指向后端网关（如 CloudBase 函数域名）；
+// 未设置时走同源 /api（本地 dev 由 vite proxy 转发）
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export const client = axios.create({
-  baseURL: "/api",
+  baseURL: API_BASE,
   headers: {
     "Content-Type": "application/json",
   },
