@@ -14,6 +14,12 @@ const PROMPT_META: Record<string, { desc: string; icon: string }> = {
   support: { desc: "客服回答：基于知识库回答产品咨询", icon: "📖" },
   chat: { desc: "闲聊回复：友好轻松的日常对话", icon: "💬" },
   feedback: { desc: "反馈处理：回应用户建议和反馈", icon: "✉️" },
+  plan: { desc: "计划生成：AI 学习计划生成", icon: "🗺️" },
+  roleplay: { desc: "角色扮演：场景对话 Skill", icon: "🎭" },
+  freechat: { desc: "自由对话：自然交流 Skill", icon: "💬" },
+  topic: { desc: "话题讨论：深度讨论 Skill", icon: "📝" },
+  feedback_report: { desc: "智能反馈：学习报告生成", icon: "📊" },
+  bad_case: { desc: "数据飞轮：Bad Case 处理与知识草稿", icon: "🔄" },
 };
 
 export default function PromptsAdminPage() {

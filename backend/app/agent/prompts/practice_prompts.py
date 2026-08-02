@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 # 通用陪练框架：占位符在调用时用 .format() 填充
+# MARKER: PRACTICE_PROMPT_START
 PRACTICE_SYSTEM_PROMPT = """\
 你是一位专业的英语口语陪练 Agent，正在与用户进行实时口语对话练习。
 
@@ -37,6 +38,7 @@ PRACTICE_SYSTEM_PROMPT = """\
 ## 用户最新消息
 {user_message}
 """
+# MARKER: PRACTICE_PROMPT_END
 
 # 角色扮演场景定义
 ROLEPLAY_SCENARIOS = {

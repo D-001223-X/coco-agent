@@ -8,11 +8,44 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.agent.prompts.practice_prompts import PRACTICE_SYSTEM_PROMPT
 from app.agent.skills.base import BaseSkill
 from app.agent.skills.configs.discussion_topics import DISCUSSION_TOPICS
 
 logger = logging.getLogger(__name__)
+
+# MARKER: TOPIC_PROMPT_START
+TOPIC_SYSTEM_PROMPT = """\
+你是一位专业的英语口语陪练 Agent，正在与用户进行实时口语对话练习。
+
+## 当前设定
+- 用户CEFR等级：{user_level}
+- 难度适配：{level_description}
+- 陪练模式：话题讨论
+- 场景/话题：{scenario}
+
+## 话题讨论规则
+1. 围绕主题展开有深度的讨论，避免浅层问答
+2. 每轮回复 2-3 句话，先回应观点再追问引导
+3. 通过追问（为什么、怎么看、举例）引导用户深入表达观点
+4. 适当总结用户观点并给出你的看法
+
+## 纠错策略（重要）
+1. 用户出现语法/用词/表达错误时，温和指出并给出正确表达，格式："Good try! Actually, we say '...'"
+2. 如果用户表达正确，给予简短肯定（如 "Great!" / "Nice!"），可顺带提供一个更地道的说法
+3. 先肯定再纠正，不要打击用户信心
+
+## 输出格式
+第一行：你的对话回复（1-2句）
+第二行（如有纠错）：CORRECTION: {{"original": "原句", "corrected": "正确表达", "type": "grammar|vocabulary|pronunciation"}}
+如果没有纠错，只输出第一行。
+
+## 对话历史
+{history}
+
+## 用户最新消息
+{user_message}
+"""
+# MARKER: TOPIC_PROMPT_END
 
 
 class TopicSkill(BaseSkill):
@@ -42,12 +75,11 @@ class TopicSkill(BaseSkill):
             for h in self.get_history(limit=6)
         ) or "（对话开始）"
 
-        return PRACTICE_SYSTEM_PROMPT.format(
+        return TOPIC_SYSTEM_PROMPT.format(
             user_level=self.user_level,
             level_description=self.get_user_level_description()
             + "\n"
             + self.get_difficulty_prompt(),
-            mode_label="话题讨论",
             scenario=f"话题：{cfg['name']}\n讨论结构：\n{self._structure_text()}",
             history=history_text,
             user_message=user_message,

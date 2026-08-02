@@ -1,10 +1,16 @@
 """Prompt admin service: read/update prompts via file markers + version history.
 
 Prompt storage locations:
-  - intent   : backend/app/services/intent_service.py       (SYSTEM_PROMPT)
-  - support  : backend/app/services/llm_service.py          (SUPPORT_SYSTEM_PROMPT)
-  - chat     : backend/app/services/llm_service.py          (CHAT_SYSTEM_PROMPT)
-  - feedback : backend/app/services/prompts/feedback_prompt.py (FEEDBACK_SYSTEM_PROMPT)
+  - intent          : backend/app/services/intent_service.py   (SYSTEM_PROMPT)
+  - support         : backend/app/services/llm_service.py      (SUPPORT_SYSTEM_PROMPT)
+  - chat            : backend/app/services/llm_service.py      (CHAT_SYSTEM_PROMPT)
+  - feedback        : backend/app/services/prompts/feedback_prompt.py (FEEDBACK_SYSTEM_PROMPT)
+  - plan            : backend/app/routers/practice/plan.py     (_PLAN_SYSTEM_PROMPT)
+  - roleplay        : backend/app/agent/skills/roleplay.py     (ROLEPLAY_SYSTEM_PROMPT)
+  - freechat        : backend/app/agent/skills/freechat.py     (FREECHAT_SYSTEM_PROMPT)
+  - topic           : backend/app/agent/skills/topic.py        (TOPIC_SYSTEM_PROMPT)
+  - feedback_report : backend/app/services/practice/feedback_service.py (FEEDBACK_PROMPT)
+  - bad_case        : backend/app/services/admin/bad_case_service.py (DRAFT_PROMPT)
 
 Each prompt is wrapped in ``# MARKER: <NAME>_PROMPT_START`` /
 ``# MARKER: <NAME>_PROMPT_END`` comment lines inside its source file.
@@ -31,9 +37,19 @@ PROMPT_SOURCES: dict[str, Path] = {
     "support": BACKEND_DIR / "app" / "services" / "llm_service.py",
     "chat": BACKEND_DIR / "app" / "services" / "llm_service.py",
     "feedback": BACKEND_DIR / "app" / "services" / "prompts" / "feedback_prompt.py",
+    # ── 新增 6 个（T-007 扩展）──
+    "plan": BACKEND_DIR / "app" / "routers" / "practice" / "plan.py",
+    "roleplay": BACKEND_DIR / "app" / "agent" / "skills" / "roleplay.py",
+    "freechat": BACKEND_DIR / "app" / "agent" / "skills" / "freechat.py",
+    "topic": BACKEND_DIR / "app" / "agent" / "skills" / "topic.py",
+    "feedback_report": BACKEND_DIR / "app" / "services" / "practice" / "feedback_service.py",
+    "bad_case": BACKEND_DIR / "app" / "services" / "admin" / "bad_case_service.py",
 }
 
-PROMPT_NAMES = ["intent", "support", "chat", "feedback"]
+PROMPT_NAMES = [
+    "intent", "support", "chat", "feedback",
+    "plan", "roleplay", "freechat", "topic", "feedback_report", "bad_case",
+]
 
 _MARKER_RE = re.compile(
     r"# MARKER: (?P<name>\w+)_PROMPT_START\n"

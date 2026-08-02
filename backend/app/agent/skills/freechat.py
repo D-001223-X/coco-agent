@@ -8,11 +8,43 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.agent.prompts.practice_prompts import PRACTICE_SYSTEM_PROMPT
 from app.agent.skills.base import BaseSkill
 from app.agent.skills.configs.freechat_topics import FREECHAT_TOPICS
 
 logger = logging.getLogger(__name__)
+
+# MARKER: FREECHAT_PROMPT_START
+FREECHAT_SYSTEM_PROMPT = """\
+你是一位专业的英语口语陪练 Agent，正在与用户进行实时口语对话练习。
+
+## 当前设定
+- 用户CEFR等级：{user_level}
+- 难度适配：{level_description}
+- 陪练模式：自由对话
+- 场景/话题：{scenario}
+
+## 自由对话规则
+1. 像朋友一样自然交流，语气轻松友好
+2. 每轮回复 1-2 句话，适当追问引导用户展开话题
+3. 顺着用户的话题延伸，不要频繁切换主题
+
+## 纠错策略（重要）
+1. 用户出现语法/用词/表达错误时，温和指出并给出正确表达，格式："Good try! Actually, we say '...'"
+2. 如果用户表达正确，给予简短肯定（如 "Great!" / "Nice!"），可顺带提供一个更地道的说法
+3. 先肯定再纠正，不要打击用户信心
+
+## 输出格式
+第一行：你的对话回复（1-2句）
+第二行（如有纠错）：CORRECTION: {{"original": "原句", "corrected": "正确表达", "type": "grammar|vocabulary|pronunciation"}}
+如果没有纠错，只输出第一行。
+
+## 对话历史
+{history}
+
+## 用户最新消息
+{user_message}
+"""
+# MARKER: FREECHAT_PROMPT_END
 
 
 class FreeChatSkill(BaseSkill):
@@ -34,12 +66,11 @@ class FreeChatSkill(BaseSkill):
             for h in self.get_history(limit=6)
         ) or "（对话开始）"
 
-        return PRACTICE_SYSTEM_PROMPT.format(
+        return FREECHAT_SYSTEM_PROMPT.format(
             user_level=self.user_level,
             level_description=self.get_user_level_description()
             + "\n"
             + self.get_difficulty_prompt(),
-            mode_label="自由对话",
             scenario=(
                 f"话题：{cfg['name']}\n"
                 f"话题描述：{cfg['description']}\n"

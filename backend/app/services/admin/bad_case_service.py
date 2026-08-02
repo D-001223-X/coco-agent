@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 # Knowledge base file (repo root /knowledge_base/coco_knowledge.md)
 KB_PATH = Path(__file__).resolve().parent.parent.parent.parent.parent / "knowledge_base" / "coco_knowledge.md"
 
-DRAFT_PROMPT = """你是一个知识库编辑助手。用户问的是「{question}」，上下文是「{context}」。
+# MARKER: BAD_CASE_PROMPT_START
+DRAFT_PROMPT = """\
+你是一个知识库编辑助手。用户问的是「{question}」，上下文是「{context}」。
 
 请为可可语伴产品生成一个可直接入库的知识条目，格式如下：
 
@@ -26,6 +28,7 @@ DRAFT_PROMPT = """你是一个知识库编辑助手。用户问的是「{questio
 
 不要输出通用解释，只输出具体的产品知识。如果用户问题无法对应到具体产品信息，请输出"无法生成"。
 """
+# MARKER: BAD_CASE_PROMPT_END
 
 
 class BadCaseService:

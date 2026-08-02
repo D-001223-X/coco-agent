@@ -12,6 +12,7 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# MARKER: FEEDBACK_REPORT_PROMPT_START
 FEEDBACK_PROMPT = """\
 你是一位专业的学习分析师。基于以下学习数据，生成个性化反馈报告。
 
@@ -32,6 +33,7 @@ FEEDBACK_PROMPT = """\
 ## 输出格式
 直接输出文本，不超过200字。
 """
+# MARKER: FEEDBACK_REPORT_PROMPT_END
 
 
 class FeedbackService:

@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/practice/plan", tags=["practice-plan"])
 UserDep = Annotated[User, Depends(get_current_user)]
 
 # 计划生成 System Prompt（CEFR 规则来自知识库）
+# MARKER: PLAN_PROMPT_START
 _PLAN_SYSTEM_PROMPT = """\
 你是可可语伴的AI学习规划师。根据用户的测评结果和学习目标，生成一份个性化的英语学习计划。
 
@@ -53,6 +54,7 @@ CEFR 等级参考：
 3. 场景要与用户的备考/学习目标匹配
 4. weeks 为完成该里程碑的周数（正整数）
 """
+# MARKER: PLAN_PROMPT_END
 
 
 class AssessmentIn(BaseModel):
