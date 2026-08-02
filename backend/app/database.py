@@ -44,7 +44,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         _engine = create_async_engine(
-            get_settings().database_url,
+            get_settings().effective_database_url,
             echo=False,
         )
     return _engine

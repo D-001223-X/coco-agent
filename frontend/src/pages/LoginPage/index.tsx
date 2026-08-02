@@ -63,6 +63,17 @@ export default function LoginPage() {
             {isSubmitting ? "登录中..." : "登录"}
           </Button>
         </form>
+
+        {/* 访客模式入口：扫码即用，无需登录 */}
+        <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+          <p className="text-xs text-gray-400 mb-3">不想登录？扫码即用</p>
+          <a
+            href="/practice/assessment"
+            className="inline-block w-full py-3 rounded-button bg-warmwhite border border-gray-200 text-coral text-sm font-semibold hover:border-coral/40 transition-colors"
+          >
+            👋 访客体验（无需注册）
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     # ── Database ────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///./coco.db"
+    # CloudBase 数据库切换（T-mobile 部署）：USE_CLOUD_DB=true 时优先用云端连接串
+    use_cloud_db: bool = False
+    cloudbase_database_url: str | None = None
 
     # ── JWT ─────────────────────────────────────────────────
     secret_key: str = "your-secret-key-change-this-in-production"
@@ -54,6 +57,13 @@ class Settings(BaseSettings):
         return self
 
     # ── Dynamic URL properties ──────────────────────────────
+    @property
+    def effective_database_url(self) -> str:
+        """生产部署时切到 CloudBase；本地默认 SQLite。"""
+        if self.use_cloud_db and self.cloudbase_database_url:
+            return self.cloudbase_database_url
+        return self.database_url
+
     @property
     def deepseek_base_url(self) -> str:
         return (

@@ -26,10 +26,36 @@ const PLAN_KEY = "learningPlan";
 const GOALS_KEY = "learningGoals";
 const SESSION_KEY = "practiceSession";
 
-// 统一取登录用户 ID（与进度/反馈后端查询口径一致）
+// 统一取用户标识：已登录 → 用户 ID；访客 → 设备 ID（进度/反馈按此隔离）
 export function currentUserId(): string {
   const uid = useAuthStore.getState().user_id;
-  return uid != null ? String(uid) : "user_001";
+  return uid != null ? String(uid) : getDeviceId();
+}
+
+// 访客设备 ID（基于浏览器指纹，不同设备天然隔离）
+export function getDeviceId(): string {
+  let deviceId = localStorage.getItem("deviceId");
+  if (!deviceId) {
+    const fingerprint = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      screen.colorDepth,
+    ].join("|");
+    // 简易 hash → 稳定短 ID
+    let h = 0;
+    for (let i = 0; i < fingerprint.length; i++) {
+      h = (Math.imul(31, h) + fingerprint.charCodeAt(i)) | 0;
+    }
+    deviceId =
+      "dev_" +
+      (h >>> 0).toString(16).padStart(8, "0") +
+      "_" +
+      Date.now().toString(36);
+    localStorage.setItem("deviceId", deviceId);
+  }
+  return deviceId;
 }
 
 // ── Flatten questions with their section ─────────────────

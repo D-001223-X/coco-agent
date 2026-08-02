@@ -116,7 +116,7 @@ export default function AssessmentQuestionPage() {
               if (idx > 0) setCurrentSection(order[idx - 1]);
             }}
             disabled={currentSection === "listening"}
-            className="px-5 py-2.5 rounded-button text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+            className="px-5 min-h-[48px] rounded-button text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
           >
             上一部分
           </button>
@@ -126,14 +126,14 @@ export default function AssessmentQuestionPage() {
               const idx = order.indexOf(currentSection);
               if (idx < order.length - 1) setCurrentSection(order[idx + 1]);
             }}
-            className="px-5 py-2.5 rounded-button text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50"
+            className="px-5 min-h-[48px] rounded-button text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50"
           >
             下一部分
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-6 py-2.5 rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-50"
+            className="px-6 min-h-[48px] rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-50"
           >
             {submitting ? "提交中..." : "提交测评"}
           </button>

@@ -34,6 +34,23 @@ export default function PracticeChatPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chatMessages.length]);
 
+  // 移动端键盘防遮挡：键盘弹出时输入框自动滚动到可视区
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const input = document.getElementById("chat-input");
+      if (input && window.visualViewport) {
+        const viewport = window.visualViewport;
+        const keyboardHeight = window.innerHeight - viewport.height;
+        if (keyboardHeight > 100) {
+          input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    };
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    return () =>
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+  }, []);
+
   const currentMode = modes.find((m) => m.id === currentModeId) ?? null;
   const currentScenarioName = currentMode?.scenarios.find(
     (s) => s.id === currentScenario
@@ -57,9 +74,10 @@ export default function PracticeChatPage() {
 
   return (
     <MainLayout>
-      <div className="flex-1 flex flex-col h-[calc(100vh-64px)]">
+      {/* 移动端：100dvh 更好处理地址栏/键盘；桌面 100vh */}
+      <div className="flex-1 flex flex-col h-[calc(100vh-56px)] md:h-[calc(100vh-64px)]">
         {/* 顶部工具栏：返回 + 模式 + 场景 + 切换 */}
-        <div className="h-14 px-6 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm">
+        <div className="h-12 md:h-14 px-3 md:px-6 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => navigate("/practice/modes")}

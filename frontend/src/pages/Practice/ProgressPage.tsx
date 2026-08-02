@@ -140,11 +140,12 @@ export default function ProgressPage() {
         <h1 className="text-2xl font-bold text-gray-800 mb-6">学习进度</h1>
 
         {/* 统计卡片 */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <StatCard label="学习天数" value={progress?.totalDays ?? 0} />
-          <StatCard label="会话次数" value={progress?.totalSessions ?? 0} />
-          <StatCard label="对话轮次" value={progress?.totalRounds ?? 0} />
-          <StatCard label="纠正次数" value={progress?.totalCorrections ?? 0} />
+        {/* 统计卡片：移动端横向滚动，桌面 4 列网格 */}
+        <div className="flex md:grid md:grid-cols-4 gap-3 md:gap-4 mb-8 overflow-x-auto pb-1 md:overflow-visible md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="min-w-[120px] md:min-w-0"><StatCard label="学习天数" value={progress?.totalDays ?? 0} /></div>
+          <div className="min-w-[120px] md:min-w-0"><StatCard label="会话次数" value={progress?.totalSessions ?? 0} /></div>
+          <div className="min-w-[120px] md:min-w-0"><StatCard label="对话轮次" value={progress?.totalRounds ?? 0} /></div>
+          <div className="min-w-[120px] md:min-w-0"><StatCard label="纠正次数" value={progress?.totalCorrections ?? 0} /></div>
         </div>
 
         {/* 雷达图 + 趋势图 */}

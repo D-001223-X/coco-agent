@@ -18,6 +18,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
   return (
     <div className="flex gap-2">
       <input
+        id="chat-input"
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -29,12 +30,12 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
         }}
         placeholder="输入英文消息...（Enter 发送）"
         disabled={disabled}
-        className="flex-1 px-4 py-3 border border-gray-200 rounded-button text-sm focus:outline-none focus:ring-2 focus:ring-coral/30 disabled:opacity-50"
+        className="flex-1 min-h-[48px] px-4 py-3 border border-gray-200 rounded-button text-sm focus:outline-none focus:ring-2 focus:ring-coral/30 disabled:opacity-50"
       />
       <button
         onClick={handleSend}
         disabled={disabled || !text.trim()}
-        className="px-6 py-3 rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-40 transition-colors"
+        className="min-h-[48px] px-5 md:px-6 py-3 rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-40 transition-colors"
       >
         发送
       </button>
