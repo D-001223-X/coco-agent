@@ -16,6 +16,9 @@ from pydantic import BaseModel
 
 from app.models import User
 from app.routers.auth import get_current_user
+from app.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 from app.services.practice.session_service import SessionService
 from app.agent.skills import get_available_modes
 
@@ -24,6 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/practice", tags=["practice-session"])
 
 UserDep = Annotated[User, Depends(get_current_user)]
+DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 _session_service = SessionService()
 
@@ -97,9 +101,9 @@ async def chat(req: ChatRequest, _user: UserDep):
 
 
 @router.post("/session/end")
-async def end_session(req: EndSessionRequest, _user: UserDep):
-    """结束会话。"""
-    session = _session_service.end_session(req.sessionId)
+async def end_session(req: EndSessionRequest, _user: UserDep, db: DbDep):
+    """结束会话并持久化记录。"""
+    session = await _session_service.end_session_async(req.sessionId, db=db)
     return {
         "code": 0,
         "data": {"sessionId": req.sessionId, "ended": session is not None},

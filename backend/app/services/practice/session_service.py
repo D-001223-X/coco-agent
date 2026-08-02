@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -95,7 +96,61 @@ class SessionService:
         session = self._sessions.pop(session_id, None)
         if session is not None:
             session.ended_at = time.time()
+            # 持久化会话记录（T-006 进度统计）
+            self._persist_session(session)
         return session
+
+    async def end_session_async(
+        self, session_id: str, db: Any = None
+    ) -> PracticeSession | None:
+        """结束会话并持久化（异步版本，支持传入 AsyncSession）。"""
+        session = self._sessions.pop(session_id, None)
+        if session is not None:
+            session.ended_at = time.time()
+            if db is not None:
+                await self._persist_session_async(session, db)
+        return session
+
+    def _persist_session(self, session: PracticeSession) -> None:
+        """同步持久化（无 db 时打印日志，由异步版本负责真正入库）。"""
+        logger.info(
+            "[session] 会话结束待持久化: %s mode=%s rounds=%d",
+            session.session_id, session.mode, len(session.history),
+        )
+
+    @staticmethod
+    async def _persist_session_async(session: PracticeSession, db) -> None:
+        """将会话记录写入数据库。"""
+        from datetime import datetime, timezone
+
+        from sqlalchemy import select
+
+        from app.models import PracticeSessionRecord
+
+        record = await db.execute(
+            select(PracticeSessionRecord).where(
+                PracticeSessionRecord.session_id == session.session_id
+            )
+        )
+        existing = record.scalar_one_or_none()
+        payload = json.dumps(session.history, ensure_ascii=False)
+        if existing:
+            existing.rounds_json = payload
+            existing.ended_at = datetime.now(timezone.utc)
+        else:
+            db.add(PracticeSessionRecord(
+                session_id=session.session_id,
+                user_id=session.user_id,
+                mode=session.mode,
+                scenario=session.scenario,
+                user_level=session.user_level,
+                rounds_json=payload,
+                started_at=datetime.fromtimestamp(
+                    session.started_at, tz=timezone.utc
+                ),
+                ended_at=datetime.now(timezone.utc),
+            ))
+        await db.commit()
 
     def switch_scenario(
         self, session_id: str, scenario: str

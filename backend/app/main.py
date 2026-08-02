@@ -18,6 +18,7 @@ from app.routers.admin import params as admin_params
 from app.routers.admin import prompts as admin_prompts
 from app.routers.practice import assessment as practice_assessment
 from app.routers.practice import plan as practice_plan
+from app.routers.practice import progress as practice_progress
 from app.routers.practice import session as practice_session
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ app.include_router(admin_config.router)
 app.include_router(practice_assessment.router)
 app.include_router(practice_plan.router)
 app.include_router(practice_session.router)
+app.include_router(practice_progress.router)
 
 
 # ── Global exception handlers ─────────────────────────────

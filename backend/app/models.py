@@ -124,6 +124,25 @@ class SystemConfig(Base):
     )
 
 
+class PracticeSessionRecord(Base):
+    """已结束的口语陪练会话记录（T-006 进度统计用）。
+
+    会话结束后由 session_service 持久化到此表，供进度计算。
+    """
+
+    __tablename__ = "practice_session_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, default="user_001")
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    scenario: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    user_level: Mapped[str] = mapped_column(String(5), nullable=False, default="A2")
+    rounds_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Log(Base):
     __tablename__ = "logs"
 
