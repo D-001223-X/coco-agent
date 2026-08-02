@@ -44,6 +44,11 @@ class EndSessionRequest(BaseModel):
     sessionId: str
 
 
+class SwitchScenarioRequest(BaseModel):
+    sessionId: str
+    scenario: str
+
+
 @router.get("/modes")
 async def get_modes(_user: UserDep):
     """返回可用陪练模式及场景列表。"""
@@ -98,5 +103,28 @@ async def end_session(req: EndSessionRequest, _user: UserDep):
     return {
         "code": 0,
         "data": {"sessionId": req.sessionId, "ended": session is not None},
+        "msg": "success",
+    }
+
+
+@router.post("/session/switch")
+async def switch_scenario(req: SwitchScenarioRequest, _user: UserDep):
+    """切换会话的场景/话题（保留历史上下文，T-005）。"""
+    try:
+        session, new_greeting = _session_service.switch_scenario(
+            req.sessionId, req.scenario
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "code": 0,
+        "data": {
+            "sessionId": session.session_id,
+            "scenario": session.scenario,
+            "agentGreeting": new_greeting,
+        },
         "msg": "success",
     }

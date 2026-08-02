@@ -70,6 +70,33 @@ class BaseSkill(ABC):
             "使用基础词汇和简单句式，多引导和重复",
         )
 
+    def get_difficulty_prompt(self) -> str:
+        """根据用户级别返回难度适配的 Prompt 片段（T-005 细化）。"""
+        if self.user_level in ["A1", "A2"]:
+            return """
+## 难度适配规则（A1/A2 用户）
+- 使用**基础高频词汇**（如 A1-A2 级词汇）
+- 使用**简单句式**（主谓宾结构，1-2 个分句）
+- 语速**较慢**，适当重复关键表达
+- 每轮回复 1-2 句话
+- 纠错时提供清晰示例
+- 多使用肯定和鼓励
+"""
+        return """
+## 难度适配规则（B1/B2 用户）
+- 使用**中高级词汇**（如 B1-B2 级词汇）
+- 使用**复合句式**（含从句，3-4 个分句）
+- **正常语速**，自然节奏
+- 每轮回复 2-3 句话
+- 纠错仅针对高频/严重错误
+- 鼓励更完整表达和观点阐述
+"""
+
+    def switch_context(self, scenario: str) -> None:
+        """切换场景/话题，保留对话历史（T-005 动态切换）。"""
+        self.scenario = scenario
+        # 历史保留；可清空场景内的中间状态（如有）
+
     def append_history(self, role: str, content: str) -> None:
         """追加对话历史（user / agent）。"""
         self.conversation_history.append({"role": role, "content": content})

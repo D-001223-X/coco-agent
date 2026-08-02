@@ -97,6 +97,35 @@ class SessionService:
             session.ended_at = time.time()
         return session
 
+    def switch_scenario(
+        self, session_id: str, scenario: str
+    ) -> tuple[PracticeSession, str]:
+        """切换会话的场景/话题，保留对话历史（T-005）。
+
+        Returns
+        -------
+        (session, new_greeting)
+        """
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError(f"会话不存在: {session_id}")
+
+        # Skill 切换场景（保留 conversation_history）
+        session.skill.switch_context(scenario)
+        session.scenario = scenario
+        new_greeting = session.skill.get_greeting()
+
+        # 记录一条系统消息表明场景已切换
+        session.history.append({
+            "id": f"round_{uuid.uuid4().hex[:8]}",
+            "role": "agent",
+            "content": f"🔀 场景已切换：{new_greeting}",
+            "correction": None,
+            "agentThought": "场景/话题动态切换，历史上下文已保留",
+            "timestamp": _now_iso(),
+        })
+        return session, new_greeting
+
     # ── 对话 ─────────────────────────────────────────────
     async def chat(self, session_id: str, message: str) -> dict[str, Any]:
         """处理用户消息，返回 Agent 回复 + 纠错 + 决策轨迹。"""
