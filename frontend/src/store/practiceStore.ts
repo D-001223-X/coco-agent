@@ -7,6 +7,7 @@ import {
   startPracticeSession,
   sendPracticeChat,
   endPracticeSession,
+  switchPracticeScenario,
 } from "../api/practice";
 import type {
   PracticeQuestion,
@@ -42,6 +43,8 @@ interface PracticeState {
   // ── 会话状态（T-004）──
   modes: PracticeMode[];
   sessionId: string | null;
+  currentModeId: string | null;
+  currentScenario: string | null;
   chatMessages: ChatMessage[];
   chatting: boolean;
   // actions
@@ -53,6 +56,7 @@ interface PracticeState {
   loadModes: () => Promise<void>;
   startSession: (mode: string, scenario: string, userLevel: string, userId: string) => Promise<string | null>;
   sendChat: (message: string) => Promise<void>;
+  switchScenario: (scenario: string) => Promise<void>;
   endSession: () => Promise<void>;
   reset: () => void;
 }
@@ -78,6 +82,8 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   generating: false,
   modes: [],
   sessionId: null,
+  currentModeId: null,
+  currentScenario: null,
   chatMessages: [],
   chatting: false,
 
@@ -196,7 +202,13 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         timestamp: new Date().toISOString(),
       };
       localStorage.setItem(SESSION_KEY, sessionId);
-      set({ sessionId, chatMessages: [greeting], chatting: false });
+      set({
+        sessionId,
+        currentModeId: mode,
+        currentScenario: scenario,
+        chatMessages: [greeting],
+        chatting: false,
+      });
       return sessionId;
     } catch (e) {
       set({ chatting: false, error: "会话启动失败，请重试" });
@@ -237,6 +249,33 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       }));
     } catch (e) {
       set({ chatting: false, error: "回复失败，请重试" });
+    }
+  },
+
+  switchScenario: async (scenario) => {
+    const sessionId = get().sessionId;
+    if (!sessionId) {
+      set({ error: "会话未启动" });
+      return;
+    }
+    set({ chatting: true, error: "" });
+    try {
+      const res = await switchPracticeScenario(sessionId, scenario);
+      const switchMsg: ChatMessage = {
+        id: `round_${Date.now()}`,
+        role: "agent",
+        content: res.agentGreeting,
+        correction: null,
+        agentThought: "场景/话题动态切换，历史上下文已保留",
+        timestamp: new Date().toISOString(),
+      };
+      set((state) => ({
+        chatting: false,
+        currentScenario: res.scenario,
+        chatMessages: [...state.chatMessages, switchMsg],
+      }));
+    } catch (e) {
+      set({ chatting: false, error: "场景切换失败，请重试" });
     }
   },
 

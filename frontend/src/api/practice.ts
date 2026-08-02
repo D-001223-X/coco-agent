@@ -99,7 +99,20 @@ export interface PracticeMode {
   label: string;
   icon: string;
   description: string;
-  scenarios: string[];
+  scenarios: PracticeScenario[];
+}
+
+export interface PracticeScenario {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  difficulty: "easy" | "medium" | "hard";
+  tags?: string[];
+  role?: string;
+  category?: string;
+  guidingQuestions?: string[];
+  expansionQuestions?: string[];
 }
 
 export interface Correction {
@@ -148,4 +161,14 @@ export async function sendPracticeChat(
 
 export async function endPracticeSession(sessionId: string): Promise<void> {
   await client.post("/practice/session/end", { sessionId });
+}
+
+export async function switchPracticeScenario(
+  sessionId: string,
+  scenario: string
+): Promise<{ sessionId: string; scenario: string; agentGreeting: string }> {
+  const { data } = await client.post<
+    ApiResp<{ sessionId: string; scenario: string; agentGreeting: string }>
+  >("/practice/session/switch", { sessionId, scenario });
+  return data.data;
 }
