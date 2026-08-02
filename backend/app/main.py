@@ -18,6 +18,7 @@ from app.routers.admin import params as admin_params
 from app.routers.admin import prompts as admin_prompts
 from app.routers.practice import assessment as practice_assessment
 from app.routers.practice import plan as practice_plan
+from app.routers.practice import session as practice_session
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Vite default
+        "http://localhost:5174",  # dev worktree
         "http://localhost:3000",  # fallback
     ],
     allow_credentials=True,
@@ -52,6 +54,7 @@ app.include_router(admin_bad_cases.router)
 app.include_router(admin_config.router)
 app.include_router(practice_assessment.router)
 app.include_router(practice_plan.router)
+app.include_router(practice_session.router)
 
 
 # ── Global exception handlers ─────────────────────────────
