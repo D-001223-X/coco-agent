@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useAuthStore } from "./authStore";
 import {
   getAssessmentQuestions,
   submitAssessmentAnswers,
@@ -24,6 +25,12 @@ const ASSESSMENT_KEY = "assessment";
 const PLAN_KEY = "learningPlan";
 const GOALS_KEY = "learningGoals";
 const SESSION_KEY = "practiceSession";
+
+// 统一取登录用户 ID（与进度/反馈后端查询口径一致）
+export function currentUserId(): string {
+  const uid = useAuthStore.getState().user_id;
+  return uid != null ? String(uid) : "user_001";
+}
 
 // ── Flatten questions with their section ─────────────────
 export interface FlatQuestion extends PracticeQuestion {
@@ -122,7 +129,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       } = {
         ...result,
         assessmentId: `assess_${Date.now()}`,
-        userId: localStorage.getItem("user_id") || "user_001",
+        userId: currentUserId(),
         completedAt: new Date().toISOString(),
       };
       localStorage.setItem(ASSESSMENT_KEY, JSON.stringify(stored));
@@ -187,14 +194,14 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     }
   },
 
-  startSession: async (mode, scenario, userLevel, userId) => {
+  startSession: async (mode, scenario, userLevel, _userId) => {
     set({ chatting: true, error: "" });
     try {
       const { sessionId, agentGreeting } = await startPracticeSession({
         mode,
         scenario,
         userLevel,
-        userId,
+        userId: currentUserId(), // 统一用登录用户 ID（与进度统计口径一致）
       });
       const greeting: ChatMessage = {
         id: `round_${Date.now()}`,

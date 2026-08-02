@@ -64,10 +64,9 @@ export default function ProgressPage() {
   const handleGenerateFeedback = async () => {
     setFeedbackLoading(true);
     const assessment = loadStoredAssessment();
-    const userId = localStorage.getItem("user_id") || "user_001";
     try {
+      // 后端以登录用户为准（与 GET /progress 数据源统一），前端无需传 userId
       const text = await generateProgressFeedback(
-        userId,
         assessment?.cefrLevel ?? "A2"
       );
       setFeedback(text);

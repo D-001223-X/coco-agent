@@ -31,7 +31,8 @@ _feedback_service = FeedbackService()
 
 
 class FeedbackRequest(BaseModel):
-    userId: str = "user_001"
+    # 兼容旧请求体；实际以登录用户为准（与 GET /progress 数据源统一）
+    userId: str | None = None
     userLevel: str = "A2"
 
 
@@ -50,10 +51,15 @@ async def get_progress(_user: UserDep, db: DbDep):
 
 @router.post("/feedback")
 async def generate_feedback(req: FeedbackRequest, _user: UserDep, db: DbDep):
-    """基于进度数据生成智能反馈。"""
+    """基于进度数据生成智能反馈。
+
+    数据源与 GET /progress 统一：均使用登录用户 ID 查询
+    ``practice_session_records``，避免仪表板与建议数据不一致。
+    """
     try:
-        records = await _progress_service.load_records(db, req.userId)
-        progress = _progress_service.calculate_progress(req.userId, records)
+        user_id = str(_user.id)
+        records = await _progress_service.load_records(db, user_id)
+        progress = _progress_service.calculate_progress(user_id, records)
         feedback = await _feedback_service.generate_feedback(
             progress, req.userLevel
         )

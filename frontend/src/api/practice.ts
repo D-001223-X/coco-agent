@@ -226,12 +226,12 @@ export async function fetchLearningProgress(): Promise<LearningProgress> {
 }
 
 export async function generateProgressFeedback(
-  userId: string,
   userLevel: string
 ): Promise<string> {
+  // 后端以登录用户为准（与 GET /progress 数据源统一）
   const { data } = await client.post<ApiResp<{ feedback: string }>>(
     "/practice/progress/feedback",
-    { userId, userLevel }
+    { userLevel }
   );
   return data.data.feedback;
 }
