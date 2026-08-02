@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { path: "/admin/params", label: "检索参数", icon: "⚙️" },
   { path: "/admin/logs", label: "看板", icon: "📊" },
   { path: "/admin/bad-cases", label: "Bad Case", icon: "🐛" },
+  { path: "/admin/agent/traces", label: "Agent 追踪", icon: "🤖" },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

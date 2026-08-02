@@ -198,3 +198,55 @@ export async function generateBadCaseDraft(id: number): Promise<string> {
 export async function storeBadCase(id: number): Promise<void> {
   await client.post(`/admin/bad-cases/${id}/store`);
 }
+
+// ── Agent 决策轨迹（T-007）───────────────────────────────
+export interface AgentDecisionNode {
+  node: "intent_recognition" | "agent_decision" | "react_loop" | "multi_agent" | "reflection";
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  duration_ms: number;
+  status: "ok" | "error";
+  order: number;
+  service?: string;
+}
+
+export interface AgentTraceSummary {
+  trace_id: string;
+  user_id: number | null;
+  session_id: string | null;
+  query: string;
+  mode: string;
+  decision_path: string[];
+  status: string;
+  total_duration_ms: number;
+  created_at: string;
+}
+
+export interface AgentTraceDetail {
+  trace_id: string;
+  query: string;
+  mode: string;
+  decision_path: AgentDecisionNode[];
+  status: string;
+  total_duration_ms: number;
+  created_at: string;
+}
+
+export async function fetchAgentTraces(
+  limit = 50,
+  offset = 0
+): Promise<{ traces: AgentTraceSummary[]; total: number }> {
+  const { data } = await client.get<ApiResp<{ traces: AgentTraceSummary[]; total: number }>>(
+    `/admin/agent/traces?limit=${limit}&offset=${offset}`
+  );
+  return data.data;
+}
+
+export async function fetchAgentTraceDetail(
+  traceId: string
+): Promise<AgentTraceDetail> {
+  const { data } = await client.get<ApiResp<AgentTraceDetail>>(
+    `/admin/agent/traces/${traceId}`
+  );
+  return data.data;
+}

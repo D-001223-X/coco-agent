@@ -12,6 +12,8 @@ import ParamsAdminPage from "./pages/Admin/ParamsAdminPage";
 import LogsAdminPage from "./pages/Admin/LogsAdminPage";
 import BadCasesAdminPage from "./pages/Admin/BadCasesAdminPage";
 import BadCaseDetailPage from "./pages/Admin/BadCaseDetailPage";
+import AgentTracesPage from "./pages/Admin/AgentTracesPage";
+import AgentTraceDetailPage from "./pages/Admin/AgentTraceDetailPage";
 import AssessmentPage from "./pages/Practice/AssessmentPage";
 import AssessmentQuestionPage from "./pages/Practice/AssessmentQuestionPage";
 import AssessmentResultPage from "./pages/Practice/AssessmentResultPage";
@@ -66,6 +68,8 @@ function App() {
           <Route path="/admin/logs" element={<LogsAdminPage />} />
           <Route path="/admin/bad-cases" element={<BadCasesAdminPage />} />
           <Route path="/admin/bad-cases/:id" element={<BadCaseDetailPage />} />
+          <Route path="/admin/agent/traces" element={<AgentTracesPage />} />
+          <Route path="/admin/agent/traces/:traceId" element={<AgentTraceDetailPage />} />
           <Route path="/practice/assessment" element={<AssessmentPage />} />
           <Route path="/practice/assessment/questions" element={<AssessmentQuestionPage />} />
           <Route path="/practice/assessment/result" element={<AssessmentResultPage />} />
