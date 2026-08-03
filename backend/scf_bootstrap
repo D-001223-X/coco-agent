@@ -49,42 +49,64 @@ for v in DASHSCOPE_API_KEY WORKSPACE_ID USE_CLOUD_DB CLOUDBASE_DATABASE_URL; do
     fi
 done
 
-# ── 1. 安装依赖（阿里云镜像 + 安装到 /tmp + 3 次重试）──
+# ── 1. 安装依赖（本地 deps/ 预装 wheel 优先，在线镜像兜底）──
 # 关键：容器 site-packages 和 /home/qcloud 均只读，pip 必须 --target 装到 /tmp，
 # 并把 /tmp 依赖目录加入 PYTHONPATH（uvicorn 与 app 都能 import 到）。
 # 同一实例复用（实例不重启时 /tmp 保留），依赖已装则跳过。
+# 预装优化：zip 内 deps/ 含全部 Linux cp311 wheel → --find-links 离线安装（秒级），
+# 离线失败再走阿里云在线镜像兜底。
 PIP_INDEX="https://mirrors.aliyun.com/pypi/simple/"
 PIP_EXTRA="--trusted-host mirrors.aliyun.com --default-timeout=120"
 PIP_DEPS="/tmp/coco_deps"
+LOCAL_WHEELS="$(pwd)/deps"   # zip 解压后 deps/ 在函数根目录
 export PYTHONPATH="$PIP_DEPS:$PYTHONPATH"
 mkdir -p "$PIP_DEPS"
+
+install_deps() {
+    # $1 = 额外 pip 参数（离线 or 在线）
+    timeout 300 "$PYTHON" -m pip install \
+        --disable-pip-version-check \
+        --no-input \
+        --target="$PIP_DEPS" \
+        $1 \
+        -r requirements.txt > /tmp/pip_install.log 2>&1
+    PIP_EXIT=$?
+    sed 's/^/[pip] /' /tmp/pip_install.log
+    return $PIP_EXIT
+}
 
 if [ -f requirements.txt ]; then
     # 已装校验：fastapi + uvicorn + aiomysql 可导入则跳过安装
     if "$PYTHON" -c "import fastapi, uvicorn, aiomysql" 2>/dev/null; then
         BOOT_LOG "[pip] 依赖已安装（实例复用 /tmp 缓存），跳过 pip install"
     else
-        BOOT_LOG "检测到 requirements.txt，安装到 $PIP_DEPS（阿里云镜像，retry 3 次）..."
+        # 方案 A：本地 wheel 离线安装（最快，无需联网）
+        if [ -d "$LOCAL_WHEELS" ] && ls "$LOCAL_WHEELS"/*.whl >/dev/null 2>&1; then
+            BOOT_LOG "[pip] 发现本地预装 wheel（$(ls "$LOCAL_WHEELS"/*.whl | wc -l | tr -d ' ') 个），离线安装..."
+            if install_deps "--find-links $LOCAL_WHEELS --no-index"; then
+                BOOT_LOG "[pip] 本地离线安装成功 ✅"
+            else
+                BOOT_LOG "[pip] 本地安装失败（可能缺 wheel），5s 后转在线镜像..."
+                sleep 5
+                install_deps "-i $PIP_INDEX $PIP_EXTRA"
+            fi
+        else
+            BOOT_LOG "[pip] 无本地 wheel，直接走阿里云在线镜像..."
+            install_deps "-i $PIP_INDEX $PIP_EXTRA"
+        fi
+
+        # 重试逻辑（若上述一次未成功）
         PIP_OK=0
         for attempt in 1 2 3; do
-            BOOT_LOG "[pip] 第 $attempt 次尝试..."
-            # 输出写日志文件再 cat，保证 if 判断真实退出码（不用管道）
-            timeout 300 "$PYTHON" -m pip install \
-                --disable-pip-version-check \
-                --no-input \
-                --target="$PIP_DEPS" \
-                -i "$PIP_INDEX" $PIP_EXTRA \
-                -r requirements.txt > /tmp/pip_install.log 2>&1
-            PIP_EXIT=$?
-            sed 's/^/[pip] /' /tmp/pip_install.log
-            if [ "$PIP_EXIT" -eq 0 ]; then
+            if "$PYTHON" -c "import fastapi, uvicorn, aiomysql" 2>/dev/null; then
                 PIP_OK=1
-                BOOT_LOG "[pip] 第 $attempt 次安装成功 ✅ (exit=0)"
                 break
             fi
-            BOOT_LOG "[pip] 第 $attempt 次失败 (exit=$PIP_EXIT)，5s 后重试..."
+            BOOT_LOG "[pip] 依赖未就绪，第 $attempt 次重试（在线镜像）..."
+            install_deps "-i $PIP_INDEX $PIP_EXTRA"
             sleep 5
         done
+
         if [ "$PIP_OK" -eq 0 ]; then
             BOOT_LOG "FATAL: pip install 3 次均失败，请检查 [pip] 日志"
             exit 1

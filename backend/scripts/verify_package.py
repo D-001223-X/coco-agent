@@ -96,9 +96,18 @@ def main() -> int:
             "PYTHONPATH 注入": "PYTHONPATH=" in boot_text and "coco_deps" in boot_text,
             "真实退出码(非管道)": "PIP_EXIT=$?" in boot_text,
             "uvicorn 9000": "--port 9000" in boot_text,
+            "本地 wheel 预装": "--find-links" in boot_text and "LOCAL_WHEELS" in boot_text,
         }
         for label, passed in checks.items():
             print(f"  {'✅' if passed else '❌'} {label}")
+        # deps/ 目录含 wheel 检查
+        with zipfile.ZipFile(zip_path) as zf:
+            wheels = [n for n in zf.namelist() if n.startswith("deps/") and n.endswith(".whl")]
+            if wheels:
+                print(f"  ✅ deps/ 预装 {len(wheels)} 个 wheel")
+            else:
+                print("  ❌ deps/ 无 wheel（预装失效）")
+                ok = False
 
         # ── 3. 依赖检查（dry-run 安装）────────────────────
         print("\n── 3. 依赖 ──")
