@@ -26,7 +26,21 @@ from app.models import Base
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
 
-KB_DIR = Path(__file__).resolve().parent.parent.parent / "knowledge_base"
+# 知识库目录：兼容两种布局
+#   本地：<repo>/backend/scripts/build_index.py → <repo>/knowledge_base（上 3 级）
+#   云函数：<func>/scripts/build_index.py + <func>/knowledge_base（上 2 级）
+def _resolve_kb_dir() -> Path:
+    script = Path(__file__).resolve()
+    candidates = [
+        script.parent.parent.parent / "knowledge_base",  # 本地 repo 根
+        script.parent.parent / "knowledge_base",         # 云函数包内
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+KB_DIR = _resolve_kb_dir()
 
 VECTOR_DIM = 256
 
