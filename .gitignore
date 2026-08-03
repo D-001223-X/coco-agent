@@ -44,3 +44,7 @@ Thumbs.db
 # Test outputs
 test_results.json
 run_acceptance_tests.py
+
+# CloudBase 部署产物（勿提交）
+backend.zip
+cloudbase_env.txt
