@@ -29,6 +29,8 @@ class Session(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[int | None] = mapped_column(default=None, nullable=True)
+    # P-002 设备标识：访客会话用 device_id 隔离（不依赖登录）
+    device_id: Mapped[str | None] = mapped_column(String(64), default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

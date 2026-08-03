@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,6 +65,59 @@ class ErrorResponse(BaseModel):
     msg: str
 
 
+# ── P-002 设备/用户识别依赖 ──────────────────────────────
+class ChatIdentity(BaseModel):
+    """已登录用户 或 访客（X-Device-ID 标识）。"""
+    user_id: int | None = None
+    email: str | None = None
+    is_guest: bool = True
+    device_id: str | None = None
+
+
+async def get_chat_identity(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    x_device_id: Annotated[str | None, Header()] = None,
+) -> ChatIdentity:
+    """优先用 JWT 识别用户；无 token 时用 X-Device-ID 作为访客标识。"""
+    # 尝试解析 Bearer token（失败不阻塞访客）
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        try:
+            from jose import jwt as jose_jwt
+            s = get_settings()
+            payload = jose_jwt.decode(
+                auth[7:].strip(), s.secret_key, algorithms=[s.algorithm]
+            )
+            email = payload.get("sub")
+            if email:
+                result = await db.execute(
+                    select(User).where(User.email == email)
+                )
+                user = result.scalar_one_or_none()
+                if user is not None:
+                    return ChatIdentity(
+                        user_id=user.id,
+                        email=user.email,
+                        is_guest=False,
+                        device_id=None,
+                    )
+        except Exception:
+            pass  # token 无效 → 降级访客
+
+    # 访客：需 X-Device-ID（前端必带）
+    device_id = (x_device_id or "").strip()
+    if not device_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Device-ID for guest access",
+        )
+    return ChatIdentity(is_guest=True, device_id=device_id)
+
+
+ChatIdentityDep = Annotated[ChatIdentity, Depends(get_chat_identity)]
+
+
 # ── Route ────────────────────────────────────────────────
 @router.post(
     "/chat",
@@ -77,12 +130,12 @@ class ErrorResponse(BaseModel):
 )
 async def chat(
     request: ChatRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    identity: ChatIdentityDep,
     db: AsyncSession = Depends(get_db),
 ):
     """Full AI customer-service pipeline.
 
-    1. Session management (create or validate)
+    1. Session management (create or validate; 访客用 device_id 隔离)
     2. Fetch conversation history
     3. Intent recognition
     4. Route: CHAT → LLM; SUPPORT/FEEDBACK → retrieve → rerank → LLM
@@ -96,22 +149,30 @@ async def chat(
         # ── 1. Session management ────────────────────────────
         session_id = request.session_id
         if session_id is None:
-            # Create new session
+            # Create new session（登录用户 user_id；访客 device_id）
             session_id = uuid.uuid4().hex
-            current_session = Session(id=session_id, user_id=current_user.id)
+            current_session = Session(
+                id=session_id,
+                user_id=identity.user_id if not identity.is_guest else None,
+                device_id=identity.device_id,
+            )
             db.add(current_session)
             await db.commit()
         else:
-            # Validate existing session belongs to current user
+            # Validate existing session belongs to current user / device
             result = await db.execute(
-                select(Session).where(
-                    Session.id == session_id,
-                    Session.user_id == current_user.id,
-                )
+                select(Session).where(Session.id == session_id)
             )
             current_session = result.scalar_one_or_none()
             if current_session is None:
                 raise HTTPException(status_code=404, detail="Session not found")
+            # 归属校验：登录用户校验 user_id；访客校验 device_id
+            if identity.is_guest:
+                if current_session.device_id != identity.device_id:
+                    raise HTTPException(status_code=404, detail="Session not found")
+            else:
+                if current_session.user_id != identity.user_id:
+                    raise HTTPException(status_code=404, detail="Session not found")
 
         # ── 2. Fetch history (last 10 messages, chronologically) ──
         history_result = await db.execute(
@@ -242,7 +303,7 @@ async def chat(
             duration_ms=0,
             service="chat",
             status="error",
-            user_id=current_user.id,
+            user_id=identity.user_id if identity.user_id is not None else 0,
             session_id=request.session_id,
         )
         raise HTTPException(
