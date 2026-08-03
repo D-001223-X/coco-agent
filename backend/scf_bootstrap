@@ -49,14 +49,33 @@ for v in DASHSCOPE_API_KEY WORKSPACE_ID USE_CLOUD_DB CLOUDBASE_DATABASE_URL; do
     fi
 done
 
-# ── 1. 安装依赖（带超时 + 可见输出）──────────────────────
+# ── 1. 安装依赖（阿里云镜像 + 超时 + 3 次重试）─────────
+# CloudBase 容器访问官方 PyPI (files.pythonhosted.org) 频繁超时，
+# 强制走阿里云 PyPI 镜像 + 国内 trusted host + 提高超时 + 多次重试。
+PIP_INDEX="https://mirrors.aliyun.com/pypi/simple/"
+PIP_EXTRA="--trusted-host mirrors.aliyun.com --default-timeout=120"
+
 if [ -f requirements.txt ]; then
-    BOOT_LOG "检测到 requirements.txt，开始安装依赖（最多 180s）..."
-    # 用 timeout 防止无限卡住；不用 -q 保证输出可见
-    timeout 180 "$PYTHON" -m pip install --disable-pip-version-check --no-input \
-        -r requirements.txt 2>&1 | sed 's/^/[PIP] /'
-    PIP_EXIT=${PIPESTATUS[0]}
-    BOOT_LOG "pip install 退出码: $PIP_EXIT"
+    BOOT_LOG "检测到 requirements.txt，开始安装依赖（阿里云镜像，timeout 120s，retry 3 次）..."
+    PIP_OK=0
+    for attempt in 1 2 3; do
+        BOOT_LOG "[pip] 第 $attempt 次尝试..."
+        if timeout 300 "$PYTHON" -m pip install \
+            --disable-pip-version-check \
+            --no-input \
+            -i "$PIP_INDEX" $PIP_EXTRA \
+            -r requirements.txt 2>&1 | sed 's/^/[pip] /'; then
+            PIP_OK=1
+            BOOT_LOG "[pip] 第 $attempt 次安装成功 ✅"
+            break
+        fi
+        BOOT_LOG "[pip] 第 $attempt 次失败，5s 后重试..."
+        sleep 5
+    done
+    if [ "$PIP_OK" -eq 0 ]; then
+        BOOT_LOG "FATAL: pip install 3 次均失败，请检查 [pip] 日志"
+        exit 1
+    fi
 else
     BOOT_LOG "WARN: 未找到 requirements.txt"
 fi
