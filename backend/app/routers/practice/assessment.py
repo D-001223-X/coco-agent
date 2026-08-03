@@ -50,8 +50,11 @@ def _map_cefr(total: int) -> dict[str, str]:
 
 
 @router.get("/questions")
-async def get_questions(_user: UserDep, db: DbDep):
-    """返回全部题目，按维度分组（不包含正确答案）。"""
+async def get_questions(db: DbDep):
+    """返回全部题目，按维度分组（不包含正确答案）。
+
+    访客模式：无需登录（移除 UserDep），扫码即用。
+    """
     try:
         result = await db.execute(
             text("""
@@ -94,8 +97,11 @@ async def get_questions(_user: UserDep, db: DbDep):
 
 
 @router.post("/submit")
-async def submit_assessment(body: SubmitIn, _user: UserDep, db: DbDep):
-    """批改答案：听力/阅读自动批改，口语按完成度计分。"""
+async def submit_assessment(body: SubmitIn, db: DbDep):
+    """批改答案：听力/阅读自动批改，口语按完成度计分。
+
+    访客模式：无需登录（移除 UserDep）。
+    """
     try:
         result = await db.execute(
             text("SELECT id, section, correct_answer, type FROM assessment_questions")
