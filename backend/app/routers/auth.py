@@ -84,8 +84,16 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     """Authenticate with email + 6-digit password and return a JWT token."""
-    result = await db.execute(select(User).where(User.email == request.email))
-    user = result.scalar_one_or_none()
+    try:
+        result = await db.execute(select(User).where(User.email == request.email))
+        user = result.scalar_one_or_none()
+    except Exception as exc:  # noqa: BLE001
+        # MySQL 连接/查询失败（VPC 不通 / 临时故障）→ 503 而非 401
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {exc}",
+            headers={"Retry-After": "5"},
+        )
 
     # Unified error — never reveal whether the email exists or password is wrong
     if user is None or not verify_password(request.password, user.hashed_password):

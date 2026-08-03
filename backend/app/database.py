@@ -50,13 +50,15 @@ def get_engine() -> AsyncEngine:
     if _engine is None:
         url = get_settings().effective_database_url
         kwargs: dict[str, Any] = {"echo": False}
-        # MySQL/CloudBase 云数据库：连接池 + utf8mb4（emoji/多字节安全）
+        # MySQL/CloudBase 云数据库：连接池 + utf8mb4 + 短超时（CloudBase 网关 30s）
         if url.startswith("mysql"):
             kwargs.update({
                 "pool_size": 5,
                 "max_overflow": 10,
                 "pool_recycle": 3600,
-                "pool_pre_ping": True,
+                "pool_pre_ping": True,   # 借用前 ping 检测死连接，避免挂起
+                # aiomysql 通过 connect_args 传连接超时（秒）
+                "connect_args": {"connect_timeout": 10},
             })
         _engine = create_async_engine(url, **kwargs)
     return _engine
