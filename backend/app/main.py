@@ -57,6 +57,15 @@ async def lifespan(app: FastAPI):
             app.state.init_error = f"db: {exc}"
 
         try:
+            # 题库种子（assessment_questions 表）：跨方言，幂等
+            from app.services.assessment_seed import seed_assessment_data
+            n = await seed_assessment_data()
+            logger.info("[bg] assessment seed OK (%d inserted)", n)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[bg] assessment seed failed: %s", exc)
+            app.state.init_error = (app.state.init_error or "") + f" seed: {exc}"
+
+        try:
             faiss_path = Path(s.faiss_index_path)
             chunks_path = Path(s.chunks_meta_path)
             if not faiss_path.exists() or not chunks_path.exists():
@@ -108,6 +117,8 @@ async def health():
     return {"status": "ok"}
 
 # ── CORS (restrict to known front-end origins) ─────────────
+# 注意：allow_origins 只支持精确匹配或 "*"，不支持 "*.domain" 子域通配符！
+# EdgeOne Pages 域名通过 allow_origin_regex 匹配（含 .app / .cool 等后缀）。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -115,9 +126,11 @@ app.add_middleware(
         "http://localhost:5174",  # dev worktree
         "http://localhost:5175",  # mobile-pwa dev
         "http://localhost:3000",  # fallback
-        "https://*.edgeone.app",  # EdgeOne Pages 公网（含子域）
-        "https://*.tcloudbase.com",  # CloudBase 网关
     ],
+    allow_origin_regex=(
+        r"^https://.*\.edgeone\.(app|cool)$"   # EdgeOne Pages 公网（任意子域）
+        r"|^https://.*\.tcloudbase\.com$"      # CloudBase 网关
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
