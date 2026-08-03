@@ -7,13 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.models import User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 from app.schemas.admin.param_schemas import ParamsUpdateIn
 from app.services.admin.param_service import get_param_service
 
 router = APIRouter(prefix="/api/admin/params", tags=["admin-params"])
 
-AdminDep = Annotated[User, Depends(verify_admin)]
+AdminDep = Annotated[User, Depends(admin_read_guest_ok)]
 
 
 @router.get("")

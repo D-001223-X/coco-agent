@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "../../components/Layout/AdminLayout";
+import { useReadOnlyGuard } from "../../hooks/useReadOnlyGuard";
 import {
   Card,
   ErrorText,
@@ -34,6 +35,8 @@ export default function ParamsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // T-003 只读模式
+  const { guard } = useReadOnlyGuard();
 
   const load = async () => {
     setLoading(true);
@@ -51,7 +54,7 @@ export default function ParamsAdminPage() {
     load();
   }, []);
 
-  const handleChange = async (key: keyof ParamsInfo, value: number) => {
+  const handleChange = guard(async (key: keyof ParamsInfo, value: number) => {
     if (!params) return;
     const next = { ...params, [key]: value };
     setParams(next);
@@ -64,9 +67,9 @@ export default function ParamsAdminPage() {
     } catch (e) {
       setError("参数更新失败");
     }
-  };
+  });
 
-  const handleReset = async () => {
+  const handleReset = guard(async () => {
     if (!window.confirm("确定恢复默认参数吗？")) return;
     try {
       setParams(await resetParams());
@@ -74,16 +77,16 @@ export default function ParamsAdminPage() {
     } catch (e) {
       setError("重置失败");
     }
-  };
+  });
 
-  const handleSave = async () => {
+  const handleSave = guard(async () => {
     try {
       await saveParamsToEnv();
       setSuccess("参数已保存到 .env（重启后依然生效）");
     } catch (e) {
       setError("保存到 .env 失败");
     }
-  };
+  });
 
   if (loading) {
     return (

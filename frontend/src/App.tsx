@@ -97,15 +97,10 @@ function App() {
           <Route path="/practice" element={<Navigate to="/practice/assessment" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          {/* 需登录：客服/日志/管理后台 */}
-          <Route
-            path="/chat"
-            element={
-              <RequireAuth>
-                <ChatPage />
-              </RequireAuth>
-            }
-          />
+          {/* 访客客服：/chat 无需登录（T-002，deviceId 标识访客）*/}
+          <Route path="/chat" element={<ChatPage />} />
+
+          {/* 需登录：日志/管理后台 */}
           <Route
             path="/logs"
             element={

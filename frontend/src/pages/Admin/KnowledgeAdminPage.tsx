@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminLayout } from "../../components/Layout/AdminLayout";
 import { Badge, Card, Empty, ErrorText, Loading, SuccessText } from "../../components/UI/AdminUI";
+import { showToast } from "../../utils/toast";
 import {
   deleteKnowledgeFile,
   fetchKnowledgeChunks,
@@ -19,6 +20,17 @@ export default function KnowledgeAdminPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // T-003 只读模式：非管理员禁用编辑操作
+  const [readOnly] = useState(() => {
+    const raw = localStorage.getItem("auth-storage");
+    if (!raw) return true;
+    try {
+      const parsed = JSON.parse(raw).state;
+      return parsed?.user_id !== 1;
+    } catch {
+      return true;
+    }
+  });
 
   // Chunk drawer state
   const [chunks, setChunks] = useState<KnowledgeChunk[]>([]);
@@ -71,6 +83,11 @@ export default function KnowledgeAdminPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (readOnly) {
+      showToast("演示环境仅可查看，如需编辑请登录管理员账号。");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     if (!file) return;
     setError("");
     setSuccess("");
@@ -85,6 +102,7 @@ export default function KnowledgeAdminPage() {
   };
 
   const handleDelete = async (filename: string) => {
+    if (readOnly) { showToast("演示环境仅可查看，如需编辑请登录管理员账号。"); return; }
     if (!window.confirm(`确定删除 ${filename} 吗？此操作不可恢复。`)) return;
     setError("");
     try {
@@ -97,6 +115,7 @@ export default function KnowledgeAdminPage() {
   };
 
   const handleRebuild = async () => {
+    if (readOnly) { showToast("演示环境仅可查看，如需编辑请登录管理员账号。"); return; }
     if (!window.confirm("重建索引会重新解析全部知识库文档，确定继续？")) return;
     setBuilding(true);
     setError("");
@@ -141,10 +160,10 @@ export default function KnowledgeAdminPage() {
             <div className="flex flex-col items-center justify-center gap-2">
               <button
                 onClick={handleRebuild}
-                disabled={building}
+                disabled={building || readOnly}
                 className="px-4 py-2 rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-50"
               >
-                {building ? "构建中..." : "重建索引"}
+                {building ? "构建中..." : readOnly ? "🔒 重建索引" : "重建索引"}
               </button>
             </div>
           </div>

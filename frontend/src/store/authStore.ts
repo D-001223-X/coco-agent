@@ -5,9 +5,15 @@ import { login as loginApi } from "../api/auth";
 interface AuthState {
   token: string | null;
   user_id: number | null;
+  email: string | null;
   expires_in: number | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+}
+
+// 管理员判定：ID=1 即内置 admin@app.com（T-003/T-007）
+export function isAdminUser(user_id: number | null): boolean {
+  return user_id === 1;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -15,6 +21,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       user_id: null,
+      email: null,
       expires_in: null,
       login: async (email: string, password: string) => {
         const data = await loginApi(email, password);
@@ -23,13 +30,14 @@ export const useAuthStore = create<AuthState>()(
         set({
           token: data.access_token,
           user_id: data.user_id,
+          email,
           expires_in: data.expires_in,
         });
       },
       logout: () => {
         localStorage.removeItem("token");
         localStorage.removeItem("auth-storage");
-        set({ token: null, user_id: null, expires_in: null });
+        set({ token: null, user_id: null, email: null, expires_in: null });
       },
     }),
     {
@@ -37,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         token: state.token,
         user_id: state.user_id,
+        email: state.email,
         expires_in: state.expires_in,
       }),
     }

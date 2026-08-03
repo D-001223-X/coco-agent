@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AdminLayout } from "../../components/Layout/AdminLayout";
+import { useReadOnlyGuard } from "../../hooks/useReadOnlyGuard";
 import {
   Badge,
   Card,
@@ -26,6 +27,8 @@ export default function PromptEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // T-003 只读模式（handleTest 是读操作放行，save/restore 拦截）
+  const { readOnly, guard } = useReadOnlyGuard();
 
   // Test state
   const [testQuestion, setTestQuestion] = useState("会员多少钱？");
@@ -54,7 +57,7 @@ export default function PromptEditPage() {
     if (name) load();
   }, [name]);
 
-  const handleSave = async () => {
+  const handleSave = guard(async () => {
     setSaving(true);
     setError("");
     setSuccess("");
@@ -68,7 +71,7 @@ export default function PromptEditPage() {
     } finally {
       setSaving(false);
     }
-  };
+  });
 
   const handleTest = async () => {
     setTesting(true);
@@ -87,7 +90,7 @@ export default function PromptEditPage() {
     }
   };
 
-  const handleRestore = async (item: PromptHistoryItem) => {
+  const handleRestore = guard(async (item: PromptHistoryItem) => {
     if (!window.confirm(`确定恢复到 v${item.version} 吗？`)) return;
     try {
       await restorePromptVersion(name, item.version);
@@ -96,7 +99,7 @@ export default function PromptEditPage() {
     } catch (e) {
       setError("恢复失败");
     }
-  };
+  });
 
   if (loading) {
     return (
@@ -134,7 +137,7 @@ export default function PromptEditPage() {
           <div className="flex justify-end mt-3">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || readOnly}
               className="px-6 py-2.5 rounded-button bg-coral hover:bg-coral-hover text-white text-sm font-semibold disabled:opacity-50"
             >
               {saving ? "保存中..." : "保存"}

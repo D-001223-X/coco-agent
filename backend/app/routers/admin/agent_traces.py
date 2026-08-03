@@ -17,14 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Log, User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/agent", tags=["admin-agent"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-AdminDep = Annotated[User, Depends(verify_admin)]
+AdminDep = Annotated[User, Depends(admin_read_guest_ok)]
 
 _AGENT_NODES = ("agent_decision", "react_loop")
 

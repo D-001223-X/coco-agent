@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 
 from app.database import get_db
 from app.models import User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 from app.schemas.admin.prompt_schemas import PromptTestIn, PromptUpdateIn
 from app.services.admin.prompt_service import PROMPT_NAMES, prompt_service
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter(prefix="/api/admin/prompts", tags=["admin-prompts"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-AdminDep = Annotated[User, Depends(verify_admin)]
+AdminDep = Annotated[User, Depends(admin_read_guest_ok)]
 
 
 @router.get("")

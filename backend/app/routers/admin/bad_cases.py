@@ -9,14 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 from app.schemas.admin.bad_case_schemas import BadCaseUpdateIn
 from app.services.admin.bad_case_service import BadCaseService
 
 router = APIRouter(prefix="/api/admin/bad-cases", tags=["admin-bad-cases"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-AdminDep = Annotated[User, Depends(verify_admin)]
+AdminDep = Annotated[User, Depends(admin_read_guest_ok)]
 
 _service = BadCaseService()
 

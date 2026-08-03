@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../../components/Layout/AdminLayout";
+import { useReadOnlyGuard } from "../../hooks/useReadOnlyGuard";
 import { Card, ErrorText, Loading, SuccessText } from "../../components/UI/AdminUI";
 import {
   fetchPrompts,
@@ -26,6 +27,8 @@ export default function PromptsAdminPage() {
   const [prompts, setPrompts] = useState<PromptInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // T-003 只读模式
+  const { guard } = useReadOnlyGuard();
 
   // Refusal phrase config state
   const [refuse, setRefuse] = useState<Record<string, RefusePhrase>>({});
@@ -54,7 +57,7 @@ export default function PromptsAdminPage() {
     load();
   }, [load]);
 
-  const handleSaveRefuse = async (key: string) => {
+  const handleSaveRefuse = guard(async (key: string) => {
     setSavingKey(key);
     setError("");
     try {
@@ -67,7 +70,7 @@ export default function PromptsAdminPage() {
     } finally {
       setSavingKey("");
     }
-  };
+  });
 
   return (
     <AdminLayout>

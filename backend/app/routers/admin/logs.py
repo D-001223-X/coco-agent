@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import AuditLog, BadCase, Log, User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 from app.services.admin.dashboard_service import DashboardService
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin-logs"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-AdminDep = Annotated[User, Depends(verify_admin)]
+AdminDep = Annotated[User, Depends(admin_read_guest_ok)]
 
 _dashboard_service = DashboardService()
 

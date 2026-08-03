@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.models import User
-from app.routers.admin.deps import verify_admin
+from app.routers.admin.deps import admin_read_guest_ok
 from app.services.admin.knowledge_service import KnowledgeService
 
 router = APIRouter(prefix="/api/admin/knowledge", tags=["admin-knowledge"])
@@ -17,7 +17,7 @@ _service = KnowledgeService()
 
 @router.get("/list")
 async def list_knowledge_files(
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
 ):
     """List all .md files under knowledge_base/."""
     try:
@@ -29,7 +29,7 @@ async def list_knowledge_files(
 
 @router.post("/upload")
 async def upload_knowledge_file(
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
     file: UploadFile = File(...),
 ):
     """Upload a .md file to knowledge_base/."""
@@ -46,7 +46,7 @@ async def upload_knowledge_file(
 @router.delete("/{filename}")
 async def delete_knowledge_file(
     filename: str,
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
 ):
     """Delete a knowledge file (admin-confirmed operation)."""
     try:
@@ -60,7 +60,7 @@ async def delete_knowledge_file(
 
 @router.post("/rebuild")
 async def rebuild_knowledge_index(
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
 ):
     """Rebuild FAISS/FTS5 index from knowledge base (blocking)."""
     result = await _service.rebuild_index()
@@ -70,7 +70,7 @@ async def rebuild_knowledge_index(
 
 @router.get("/status")
 async def knowledge_index_status(
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
 ):
     """Return index status: chunk count, last build time."""
     try:
@@ -82,7 +82,7 @@ async def knowledge_index_status(
 
 @router.get("/chunks")
 async def knowledge_chunks(
-    _admin: Annotated[User, Depends(verify_admin)],
+    _admin: Annotated[User, Depends(admin_read_guest_ok)],
 ):
     """Return all knowledge chunks with previews (from coco_chunks.json)."""
     try:
