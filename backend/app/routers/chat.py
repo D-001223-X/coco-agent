@@ -136,6 +136,23 @@ async def chat(
         llm_intent = intent_result.intent
 
         if intent_result.intent in _KB_INTENTS:
+            # 索引未就绪（冷启动重建中）→ 友好提示，避免空拒答
+            if not _retrieval_service.is_index_ready():
+                logger.warning(
+                    "[chat] KB index not ready yet (cold start) → friendly hint, trace=%s",
+                    trace_id,
+                )
+                return {
+                    "code": 0,
+                    "data": {
+                        "message": "系统正在初始化知识库，请稍等几秒再问我一次哦～",
+                        "intent": intent_result.intent,
+                        "trace_id": trace_id,
+                        "reactions": [],
+                    },
+                    "msg": "success",
+                }
+
             # SUPPORT / FEEDBACK: retrieve → rerank
             # 章节限定检索：若意图识别输出 related_sections，仅在该章节内检索
             # FEEDBACK 使用更宽松的检索参数（阈值更低，确保能召回相关知识）

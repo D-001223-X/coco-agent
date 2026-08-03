@@ -66,13 +66,18 @@ async def lifespan(app: FastAPI):
             app.state.init_error = (app.state.init_error or "") + f" seed: {exc}"
 
         try:
-            faiss_path = Path(s.faiss_index_path)
-            chunks_path = Path(s.chunks_meta_path)
+            # 用 effective 路径（serverless 下自动 /tmp，可写）
+            faiss_path = Path(s.effective_faiss_index_path)
+            chunks_path = Path(s.effective_chunks_meta_path)
+            # 确保父目录存在（/tmp 可写）
+            for p in (faiss_path, chunks_path):
+                p.parent.mkdir(parents=True, exist_ok=True)
             if not faiss_path.exists() or not chunks_path.exists():
-                logger.info("[bg] Knowledge index missing → rebuilding...")
+                logger.info("[bg] Knowledge index missing → rebuilding to %s ...",
+                            faiss_path.parent)
                 from scripts.build_index import main as build_main
                 await build_main()
-            logger.info("[bg] Index OK")
+            logger.info("[bg] Index OK (%s, %s)", faiss_path, chunks_path)
         except Exception as exc:  # noqa: BLE001
             logger.warning("[bg] Index build failed: %s", exc)
             app.state.init_error = (app.state.init_error or "") + f" idx: {exc}"

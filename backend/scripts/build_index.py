@@ -427,11 +427,14 @@ async def main() -> None:
     logger.info("Total chunks across %d files: %d", len(md_files), len(chunks))
 
     index, _ = build_faiss_index(chunks)
-    faiss_path = Path(s.faiss_index_path).resolve()
+    # 用 effective 路径（serverless 自动 /tmp 可写；本地用配置值）
+    faiss_path = Path(s.effective_faiss_index_path)
+    faiss_path.parent.mkdir(parents=True, exist_ok=True)
     faiss.write_index(index, str(faiss_path))
     logger.info("FAISS index saved to %s", faiss_path)
 
-    chunks_path = Path(s.chunks_meta_path).resolve()
+    chunks_path = Path(s.effective_chunks_meta_path)
+    chunks_path.parent.mkdir(parents=True, exist_ok=True)
     chunks_path.write_text(
         json.dumps(chunks, ensure_ascii=False, indent=2),
         encoding="utf-8",

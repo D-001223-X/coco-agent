@@ -1,5 +1,8 @@
 """Application configuration loaded from environment / .env file."""
 
+import os
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,8 +38,30 @@ class Settings(BaseSettings):
     score_threshold: float = 0.3
 
     # ── FAISS / chunks file paths ───────────────────────────
+    # 默认写当前目录（本地 SQLite 场景）。CloudBase 容器 /var/user 只读，
+    # 生产部署应设 FAISS_INDEX_PATH=/tmp/coco_faiss.index、CHUNKS_META_PATH=/tmp/coco_chunks.json
+    # （lifespan 会自动检测并写 /tmp）。
     faiss_index_path: str = "./coco_faiss.index"
     chunks_meta_path: str = "./coco_chunks.json"
+
+    # ── Runtime detection ────────────────────────────────────
+    @property
+    def is_serverless(self) -> bool:
+        """检测是否运行在 CloudBase/SCF 容器（/var/user 存在即视为 serverless）。"""
+        return Path("/var/user").exists() or Path("/tmp").exists() and os.environ.get("SCF_NAMESPACE") is not None
+
+    @property
+    def effective_faiss_index_path(self) -> str:
+        """serverless 环境强制用 /tmp（可写），本地用配置值。"""
+        if self.is_serverless and not self.faiss_index_path.startswith("/tmp"):
+            return "/tmp/coco_faiss.index"
+        return self.faiss_index_path
+
+    @property
+    def effective_chunks_meta_path(self) -> str:
+        if self.is_serverless and not self.chunks_meta_path.startswith("/tmp"):
+            return "/tmp/coco_chunks.json"
+        return self.chunks_meta_path
 
     # ── Model identifiers ───────────────────────────────────
     deepseek_model: str = "deepseek-v3"

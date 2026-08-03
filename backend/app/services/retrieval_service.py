@@ -132,8 +132,8 @@ class RetrievalService:
             return
 
         s = self._settings
-        faiss_path = Path(s.faiss_index_path)
-        chunks_path = Path(s.chunks_meta_path)
+        faiss_path = Path(s.effective_faiss_index_path)
+        chunks_path = Path(s.effective_chunks_meta_path)
 
         if not faiss_path.exists():
             raise FileNotFoundError(f"FAISS index not found: {faiss_path}")
@@ -144,6 +144,15 @@ class RetrievalService:
         self._chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
 
     # ── Public API ─────────────────────────────────────────
+    def is_index_ready(self) -> bool:
+        """索引是否已加载/存在（未就绪时返回 False，供上层友好提示）。"""
+        if self._faiss_index is not None:
+            return True
+        s = self._settings
+        return Path(s.effective_faiss_index_path).exists() and Path(
+            s.effective_chunks_meta_path
+        ).exists()
+
     async def search(
         self,
         query: str,
