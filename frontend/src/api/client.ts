@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getDeviceId } from "../utils/deviceId";
 
 // 部署时通过 VITE_API_BASE_URL 指向后端网关（如 CloudBase 函数域名）；
 // 未设置时走同源 /api（本地 dev 由 vite proxy 转发）
@@ -23,6 +24,10 @@ client.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // P-002 设备标识：所有请求自动携带 X-Device-ID（访客数据隔离）
+  if (config.headers) {
+    config.headers["X-Device-ID"] = getDeviceId();
   }
   return config;
 });

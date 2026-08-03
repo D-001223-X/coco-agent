@@ -21,6 +21,7 @@ import BadCasesAdminPage from "./pages/Admin/BadCasesAdminPage";
 import BadCaseDetailPage from "./pages/Admin/BadCaseDetailPage";
 import AgentTracesPage from "./pages/Admin/AgentTracesPage";
 import AgentTraceDetailPage from "./pages/Admin/AgentTraceDetailPage";
+import { RequireAdminSecret } from "./components/Admin/RequireAdminSecret";
 import AssessmentPage from "./pages/Practice/AssessmentPage";
 import AssessmentQuestionPage from "./pages/Practice/AssessmentQuestionPage";
 import AssessmentResultPage from "./pages/Practice/AssessmentResultPage";
@@ -112,81 +113,119 @@ function App() {
           <Route
             path="/admin"
             element={
-              <RequireAuth>
-                <AdminIndexPage />
-              </RequireAuth>
+              <AdminIndexPage />
             }
           />
           <Route
             path="/admin/knowledge"
             element={
-              <RequireAuth>
-                <KnowledgeAdminPage />
-              </RequireAuth>
+              <KnowledgeAdminPage />
             }
           />
           <Route
             path="/admin/prompts"
             element={
-              <RequireAuth>
-                <PromptsAdminPage />
-              </RequireAuth>
+              <PromptsAdminPage />
             }
           />
           <Route
             path="/admin/prompts/:name"
             element={
-              <RequireAuth>
-                <PromptEditPage />
-              </RequireAuth>
+              <PromptEditPage />
             }
           />
           <Route
             path="/admin/params"
             element={
-              <RequireAuth>
-                <ParamsAdminPage />
-              </RequireAuth>
+              <ParamsAdminPage />
             }
           />
           <Route
             path="/admin/logs"
             element={
-              <RequireAuth>
-                <LogsAdminPage />
-              </RequireAuth>
+              <LogsAdminPage />
             }
           />
           <Route
             path="/admin/bad-cases"
             element={
-              <RequireAuth>
-                <BadCasesAdminPage />
-              </RequireAuth>
+              <BadCasesAdminPage />
             }
           />
           <Route
             path="/admin/bad-cases/:id"
             element={
-              <RequireAuth>
-                <BadCaseDetailPage />
-              </RequireAuth>
+              <BadCaseDetailPage />
             }
           />
           <Route
             path="/admin/agent/traces"
             element={
-              <RequireAuth>
-                <AgentTracesPage />
-              </RequireAuth>
+              <AgentTracesPage />
             }
           />
           <Route
             path="/admin/agent/traces/:traceId"
             element={
-              <RequireAuth>
-                <AgentTraceDetailPage />
-              </RequireAuth>
+              <AgentTraceDetailPage />
+            }
+          />
+
+          {/* P-001 隐藏管理后台入口：/coco-admin?key=<VITE_ADMIN_SECRET> 密钥验证后重定向到 /admin */}
+          <Route
+            path="/coco-admin"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/knowledge"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/knowledge" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/prompts"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/prompts" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/params"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/params" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/logs"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/logs" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/bad-cases"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/bad-cases" replace />
+              </RequireAdminSecret>
+            }
+          />
+          <Route
+            path="/coco-admin/agent/traces"
+            element={
+              <RequireAdminSecret>
+                <Navigate to="/admin/agent/traces" replace />
+              </RequireAdminSecret>
             }
           />
 
