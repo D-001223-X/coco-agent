@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
+import { useAuthStore, isAdminUser } from "../../store/authStore";
 import { MobileBottomNav } from "./MobileBottomNav";
 
 interface MainLayoutProps {
@@ -24,8 +24,8 @@ export function MainLayout({ children }: MainLayoutProps) {
     { path: "/chat", label: "聊天" },
     { path: "/logs", label: "日志" },
   ];
-  // 仅 admin 可见管理后台入口
-  if (user_id === 1) {
+  // T-007：仅管理员可见管理后台入口（访客/普通用户隐藏；直接输 URL 可进只读模式）
+  if (isAdminUser(user_id)) {
     navItems.push({ path: "/admin", label: "管理后台" });
   }
 

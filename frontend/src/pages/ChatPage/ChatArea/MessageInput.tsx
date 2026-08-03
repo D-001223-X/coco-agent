@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
@@ -7,6 +7,23 @@ interface MessageInputProps {
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [content, setContent] = useState("");
+
+  // T-005 移动端键盘防遮挡：键盘弹出时输入框滚动到可视区
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const input = document.getElementById("chat-input");
+      if (input && window.visualViewport) {
+        const viewport = window.visualViewport;
+        const keyboardHeight = window.innerHeight - viewport.height;
+        if (keyboardHeight > 100) {
+          input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    };
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    return () =>
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,9 +35,10 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="p-4 bg-white border-t border-gray-100 flex items-end gap-3"
+      className="p-3 md:p-4 bg-white border-t border-gray-100 flex items-end gap-2 md:gap-3"
     >
       <textarea
+        id="chat-input"
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={(e) => {
@@ -37,7 +55,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       <button
         type="submit"
         disabled={disabled || !content.trim()}
-        className="px-6 py-3 rounded-button bg-coral hover:bg-coral-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-all shadow-md hover:shadow-lg"
+        className="px-5 md:px-6 min-h-[48px] rounded-button bg-coral hover:bg-coral-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-all shadow-md hover:shadow-lg"
       >
         发送
       </button>

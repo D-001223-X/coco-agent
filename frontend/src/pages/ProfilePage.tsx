@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { MainLayout } from "../components/Layout/MainLayout";
-import { useAuthStore } from "../store/authStore";
+import { isAdminUser, useAuthStore } from "../store/authStore";
 import { loadStoredAssessment } from "../store/practiceStore";
 
 export default function ProfilePage() {
@@ -79,7 +79,7 @@ export default function ProfilePage() {
           >
             💡 联系客服
           </Link>
-          {user_id === 1 && (
+          {isAdminUser(user_id) && (
             <Link
               to="/admin"
               className="block bg-white rounded-card border border-gray-100 shadow-sm p-4 text-sm text-gray-700 hover:border-coral/40 transition-colors"
