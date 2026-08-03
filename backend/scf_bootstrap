@@ -49,32 +49,47 @@ for v in DASHSCOPE_API_KEY WORKSPACE_ID USE_CLOUD_DB CLOUDBASE_DATABASE_URL; do
     fi
 done
 
-# ── 1. 安装依赖（阿里云镜像 + 超时 + 3 次重试）─────────
-# CloudBase 容器访问官方 PyPI (files.pythonhosted.org) 频繁超时，
-# 强制走阿里云 PyPI 镜像 + 国内 trusted host + 提高超时 + 多次重试。
+# ── 1. 安装依赖（阿里云镜像 + 安装到 /tmp + 3 次重试）──
+# 关键：容器 site-packages 和 /home/qcloud 均只读，pip 必须 --target 装到 /tmp，
+# 并把 /tmp 依赖目录加入 PYTHONPATH（uvicorn 与 app 都能 import 到）。
+# 同一实例复用（实例不重启时 /tmp 保留），依赖已装则跳过。
 PIP_INDEX="https://mirrors.aliyun.com/pypi/simple/"
 PIP_EXTRA="--trusted-host mirrors.aliyun.com --default-timeout=120"
+PIP_DEPS="/tmp/coco_deps"
+export PYTHONPATH="$PIP_DEPS:$PYTHONPATH"
+mkdir -p "$PIP_DEPS"
 
 if [ -f requirements.txt ]; then
-    BOOT_LOG "检测到 requirements.txt，开始安装依赖（阿里云镜像，timeout 120s，retry 3 次）..."
-    PIP_OK=0
-    for attempt in 1 2 3; do
-        BOOT_LOG "[pip] 第 $attempt 次尝试..."
-        if timeout 300 "$PYTHON" -m pip install \
-            --disable-pip-version-check \
-            --no-input \
-            -i "$PIP_INDEX" $PIP_EXTRA \
-            -r requirements.txt 2>&1 | sed 's/^/[pip] /'; then
-            PIP_OK=1
-            BOOT_LOG "[pip] 第 $attempt 次安装成功 ✅"
-            break
+    # 已装校验：fastapi + uvicorn + aiomysql 可导入则跳过安装
+    if "$PYTHON" -c "import fastapi, uvicorn, aiomysql" 2>/dev/null; then
+        BOOT_LOG "[pip] 依赖已安装（实例复用 /tmp 缓存），跳过 pip install"
+    else
+        BOOT_LOG "检测到 requirements.txt，安装到 $PIP_DEPS（阿里云镜像，retry 3 次）..."
+        PIP_OK=0
+        for attempt in 1 2 3; do
+            BOOT_LOG "[pip] 第 $attempt 次尝试..."
+            # 输出写日志文件再 cat，保证 if 判断真实退出码（不用管道）
+            timeout 300 "$PYTHON" -m pip install \
+                --disable-pip-version-check \
+                --no-input \
+                --target="$PIP_DEPS" \
+                -i "$PIP_INDEX" $PIP_EXTRA \
+                -r requirements.txt > /tmp/pip_install.log 2>&1
+            PIP_EXIT=$?
+            sed 's/^/[pip] /' /tmp/pip_install.log
+            if [ "$PIP_EXIT" -eq 0 ]; then
+                PIP_OK=1
+                BOOT_LOG "[pip] 第 $attempt 次安装成功 ✅ (exit=0)"
+                break
+            fi
+            BOOT_LOG "[pip] 第 $attempt 次失败 (exit=$PIP_EXIT)，5s 后重试..."
+            sleep 5
+        done
+        if [ "$PIP_OK" -eq 0 ]; then
+            BOOT_LOG "FATAL: pip install 3 次均失败，请检查 [pip] 日志"
+            exit 1
         fi
-        BOOT_LOG "[pip] 第 $attempt 次失败，5s 后重试..."
-        sleep 5
-    done
-    if [ "$PIP_OK" -eq 0 ]; then
-        BOOT_LOG "FATAL: pip install 3 次均失败，请检查 [pip] 日志"
-        exit 1
+        BOOT_LOG "已安装依赖目录: $(ls "$PIP_DEPS" | wc -l) 个包"
     fi
 else
     BOOT_LOG "WARN: 未找到 requirements.txt"

@@ -89,6 +89,16 @@ def main() -> int:
             print("  ✅ 具有可执行权限")
         else:
             print("  ⚠️ 本地无执行位（zip 不保留权限，CloudBase 解压后通常自动 chmod）")
+        # 关键部署配置检查（防止回归）
+        boot_text = boot.read_text(encoding="utf-8", errors="ignore")
+        checks = {
+            "阿里云镜像": "--target=" in boot_text and "mirrors.aliyun.com" in boot_text,
+            "PYTHONPATH 注入": "PYTHONPATH=" in boot_text and "coco_deps" in boot_text,
+            "真实退出码(非管道)": "PIP_EXIT=$?" in boot_text,
+            "uvicorn 9000": "--port 9000" in boot_text,
+        }
+        for label, passed in checks.items():
+            print(f"  {'✅' if passed else '❌'} {label}")
 
         # ── 3. 依赖检查（dry-run 安装）────────────────────
         print("\n── 3. 依赖 ──")
