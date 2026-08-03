@@ -3,6 +3,7 @@
 No business logic here — only registration, configuration, and startup.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -30,27 +31,48 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动时初始化数据库 + 确保知识库索引存在（云函数冷启动兜底）。
+    """启动钩子：立即 yield（让 uvicorn 立刻可接收请求），重操作后台异步执行。
+
+    为什么这样设计：
+    - CloudBase Custom Runtime 网关只检测 9000 端口能否响应；
+      若 lifespan 卡 60s 才 yield，网关超时返回 446
+    - 之前 init_db 连 MySQL 阻塞（VPC/网络/连接串），卡 60s+，导致 446
+    - 现在：lifespan 立即 yield，DB/索引后台异步；
+      首请求若未就绪返回 503 + 自动重试，10s 后可用
 
     - init_db：建表 + 默认 admin（SQLite 下含 FTS5，MySQL 自动跳过）
-    - FAISS 索引缺失时自动重建（部署时 .index/.json 可能未打包）
+    - FAISS 索引缺失时自动重建
     """
     s = get_settings()
-    try:
-        from app.database import init_db
-        await init_db()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("init_db failed at startup: %s", exc)
+    app.state.ready = False
+    app.state.init_error: str | None = None
 
-    try:
-        faiss_path = Path(s.faiss_index_path)
-        chunks_path = Path(s.chunks_meta_path)
-        if not faiss_path.exists() or not chunks_path.exists():
-            logger.info("Knowledge index missing → rebuilding...")
-            from scripts.build_index import main as build_main
-            await build_main()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Knowledge index build failed at startup: %s", exc)
+    async def _bg_init() -> None:
+        try:
+            from app.database import init_db
+            await init_db()
+            logger.info("[bg] init_db OK")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[bg] init_db failed: %s", exc)
+            app.state.init_error = f"db: {exc}"
+
+        try:
+            faiss_path = Path(s.faiss_index_path)
+            chunks_path = Path(s.chunks_meta_path)
+            if not faiss_path.exists() or not chunks_path.exists():
+                logger.info("[bg] Knowledge index missing → rebuilding...")
+                from scripts.build_index import main as build_main
+                await build_main()
+            logger.info("[bg] Index OK")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[bg] Index build failed: %s", exc)
+            app.state.init_error = (app.state.init_error or "") + f" idx: {exc}"
+
+        app.state.ready = True
+        logger.info("[bg] Initialization complete ✅")
+
+    # 后台异步执行，立即返回（不阻塞 uvicorn 启动）
+    asyncio.create_task(_bg_init())
 
     yield
 
@@ -62,13 +84,39 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+# ── 健康检查 + 启动状态端点 ─────────────────────────────
+@app.get("/")
+async def root():
+    """CloudBase 网关探活用（必须 200，避免 67s 超时 → 446）。"""
+    if not getattr(app.state, "ready", False):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": 503,
+                "msg": "Initializing, please retry in 5-10s",
+                "ready": False,
+                "error": getattr(app.state, "init_error", None),
+            },
+        )
+    return {"code": 0, "msg": "coco-api ready ✅", "ready": True}
+
+
+@app.get("/_health")
+async def health():
+    """轻量健康检查（不依赖 DB/索引）。"""
+    return {"status": "ok"}
+
 # ── CORS (restrict to known front-end origins) ─────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Vite default
         "http://localhost:5174",  # dev worktree
+        "http://localhost:5175",  # mobile-pwa dev
         "http://localhost:3000",  # fallback
+        "https://*.edgeone.app",  # EdgeOne Pages 公网（含子域）
+        "https://*.tcloudbase.com",  # CloudBase 网关
     ],
     allow_credentials=True,
     allow_methods=["*"],
