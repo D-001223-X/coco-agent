@@ -61,10 +61,53 @@
 
 ## 步骤 7：验证
 
-- [ ] 访问 `<云函数地址>/api/auth/login`（POST，`{"email":"admin@app.com","password":"123456"}`）返回 token
-- [ ] 知识库问答正常（FAISS 检索生效，云函数冷启动会自动重建索引）
-- [ ] 口语陪练对话正常（DeepSeek API）
-- [ ] 管理后台登录 + 知识库/Prompt/Agent 追踪可用
+### 部署后验证（云函数日志应看到 [BOOT] 输出）
+
+云函数「日志」页应出现：
+```
+[BOOT][HH:MM:SS] === 开始启动 coco-api (scf_bootstrap) ===
+[BOOT][HH:MM:SS] 工作目录: /var/task
+[BOOT][HH:MM:SS] 使用 Python: /usr/bin/python3
+[BOOT][HH:MM:SS] pip 版本: pip 23.x
+[BOOT][HH:MM:SS] env DASHSCOPE_API_KEY = [已设置]
+[BOOT][HH:MM:SS] env USE_CLOUD_DB = [已设置]
+[BOOT][HH:MM:SS] 检测到 requirements.txt，开始安装依赖...
+[PIP] Successfully installed ...
+[BOOT][HH:MM:SS] 模块导入全部成功 ✅
+[BOOT][HH:MM:SS] 启动 uvicorn → 0.0.0.0:9000
+INFO: Uvicorn running on http://0.0.0.0:9000
+```
+
+### 验证命令（拿到公网 URL 后，本机终端执行）
+
+```bash
+# 1. 健康检查（Swagger 文档页）
+curl -o /dev/null -w "%{http_code}\n" https://<你的函数地址>/docs
+#   期望: 200
+
+# 2. 登录 API（测试数据库连通 + admin 账号）
+curl -s -X POST https://<你的函数地址>/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@app.com","password":"123456"}'
+#   期望: {"access_token":"eyJ..."}
+
+# 3. 知识库问答（测试 FAISS 检索 + DeepSeek）
+curl -s -X POST https://<你的函数地址>/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <上一步token>" \
+  -d '{"message":"会员多少钱","history":[],"session_id":"verify","user_id":1}'
+#   期望: code=0 且回答含定价信息
+```
+
+### 日志为空时的排查
+
+| 现象 | 可能原因 | 处理 |
+| :--- | :--- | :--- |
+| 无任何 [BOOT] 日志 | bootstrap 未执行（执行方法填错 / zip 无 scf_bootstrap / 无执行位）| 确认执行方法=`scf_bootstrap`；zip 含 scf_bootstrap；脚本开头有 chmod 自修复 |
+| 有 [BOOT] 但卡在 pip install | 容器无外网或下载慢 | 等待（180s 超时后继续）；或将依赖预装进镜像 |
+| 有 [PIP] 报错 | 依赖安装失败 | 看具体包名（如 faiss-cpu 需网络）；确认 requirements.txt |
+| 卡在 [IMPORT] FATAL | 代码导入失败 | 看 [IMPORT] 错误详情（多为依赖版本冲突）|
+| uvicorn 起来了但访问 450/443 | 网关到 9000 端口未就绪 | 确认 uvicorn 监听 0.0.0.0:9000；VPC/安全组放行 |
 
 ## 常见问题
 
@@ -74,3 +117,5 @@
 | 数据库连接失败 | 确认 VPC 选择正确（与 MySQL 同 VPC）、密码正确、连接串格式无误 |
 | 索引重建慢 | FAISS 重建需读取知识库 8 个 md 文件；首次冷启动约 10-30 秒 |
 | 时区差异 | 云数据库 MySQL 时间为本地时区，不影响功能 |
+| 访问返回 450 | 函数启动未就绪（bootstrap 未拉起 9000），看日志定位卡在哪一步 |
+| 访问返回 443 | 网络/网关层错误，检查 VPC、访问路径、函数是否部署完成 |

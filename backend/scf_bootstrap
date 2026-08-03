@@ -1,38 +1,94 @@
 #!/bin/bash
-# CloudBase HTTP 云函数（Custom Runtime / Web 函数）启动脚本
-# CloudBase 会调用此脚本启动 HTTP 服务并代理外部请求到 9000 端口
+# ============================================================
+# CloudBase HTTP 云函数（Custom Runtime）增强版启动脚本
+# 目标：每一步都有可观测输出；避免静默失败；快速暴露问题
+# 约定：CloudBase 代理外部请求到本进程 9000 端口
+# ============================================================
 
-set -e
-
-# CloudBase 把代码解压到 /var/task 或当前目录（不同部署形态）
-cd "$(dirname "$0")"
-
-echo "[bootstrap] Working dir: $(pwd)"
-echo "[bootstrap] Python: $(python3 --version 2>&1 || /usr/bin/python3 --version 2>&1)"
-
-# 优先用系统 python3（CloudBase 容器内置）
-PYTHON=$(command -v python3 || echo /usr/bin/python3)
-
-# 1. 安装依赖（如未装）：CloudBase 也会自动检测 requirements.txt 安装，
-#    此处兜底（避免缓存或离线时缺失）
-if [ -f requirements.txt ]; then
-    echo "[bootstrap] Installing requirements.txt..."
-    $PYTHON -m pip install --no-cache-dir -q -r requirements.txt || \
-        echo "[bootstrap] pip install failed (will rely on CloudBase auto-install)"
-fi
-
-# 2. 验证 app 可导入（提前发现语法/导入错误，避免 9000 端口起不来）
-$PYTHON -c "import app.main; print('[bootstrap] app.main OK')" || {
-    echo "[bootstrap] Failed to import app.main"
-    exit 1
+# 关键：不要 set -e —— 每步显式检查并输出，避免"悄悄退出"
+# 所有输出带 [BOOT] 前缀 + 时间戳，stdout/stderr 均强制实时可见
+BOOT_LOG() {
+    echo "[BOOT][$(date '+%H:%M:%S')] $*"
 }
 
-# 3. 启动 uvicorn（监听 CloudBase Web 函数默认端口 9000）
-#    workers=1 适配 256MB 内存；超时 0 禁用 worker 自杀（lifespan 启动需要时间）
-echo "[bootstrap] Starting uvicorn on 0.0.0.0:9000..."
-exec $PYTHON -m uvicorn app.main:app \
+# zip 不保留执行位：自修复（CloudBase 解压后可能无 +x）
+[ -x "$0" ] || chmod +x "$0" 2>/dev/null || true
+
+BOOT_LOG "=== 开始启动 coco-api (scf_bootstrap) ==="
+BOOT_LOG "PWD=$(pwd)"
+BOOT_LOG "脚本位置=$(dirname "$0")"
+BOOT_LOG "PID=$$"
+
+# ── 进入代码目录（CloudBase 解压位置）────────────────────
+cd "$(dirname "$0")" 2>/dev/null || cd /var/task 2>/dev/null || cd "$HOME" 2>/dev/null
+BOOT_LOG "工作目录: $(pwd)"
+BOOT_LOG "目录内容: $(ls -la | head -30 | tr '\n' '|')"
+
+# ── Python 定位 ──────────────────────────────────────────
+PYTHON=""
+for cand in python3 /usr/bin/python3 /usr/local/bin/python3 /var/lang/bin/python3; do
+    if command -v "$cand" >/dev/null 2>&1; then
+        PYTHON="$cand"
+        break
+    fi
+done
+if [ -z "$PYTHON" ]; then
+    BOOT_LOG "FATAL: 未找到 python3！退出码 1"
+    exit 1
+fi
+BOOT_LOG "使用 Python: $PYTHON"
+BOOT_LOG "Python 版本: $($PYTHON --version 2>&1)"
+BOOT_LOG "pip 版本: $($PYTHON -m pip --version 2>&1 | head -1)"
+
+# ── 环境变量检查（只打 key，不打敏感值）───────────────────
+for v in DASHSCOPE_API_KEY WORKSPACE_ID USE_CLOUD_DB CLOUDBASE_DATABASE_URL; do
+    if [ -n "${!v:-}" ]; then
+        BOOT_LOG "env $v = [已设置]"
+    else
+        BOOT_LOG "env $v = [未设置!]"
+    fi
+done
+
+# ── 1. 安装依赖（带超时 + 可见输出）──────────────────────
+if [ -f requirements.txt ]; then
+    BOOT_LOG "检测到 requirements.txt，开始安装依赖（最多 180s）..."
+    # 用 timeout 防止无限卡住；不用 -q 保证输出可见
+    timeout 180 "$PYTHON" -m pip install --disable-pip-version-check --no-input \
+        -r requirements.txt 2>&1 | sed 's/^/[PIP] /'
+    PIP_EXIT=${PIPESTATUS[0]}
+    BOOT_LOG "pip install 退出码: $PIP_EXIT"
+else
+    BOOT_LOG "WARN: 未找到 requirements.txt"
+fi
+
+# ── 2. 验证核心模块可导入（含真实依赖）───────────────────
+BOOT_LOG "验证 app.main 导入..."
+"$PYTHON" -c "
+import sys
+print('[PY] python', sys.version.split()[0])
+import fastapi, sqlalchemy, uvicorn
+print('[PY] fastapi', fastapi.__version__)
+print('[PY] sqlalchemy', sqlalchemy.__version__)
+print('[PY] uvicorn', uvicorn.__version__)
+import aiomysql; print('[PY] aiomysql OK')
+import app.main
+print('[PY] app.main import OK')
+" 2>&1 | sed 's/^/[IMPORT] /'
+IMPORT_EXIT=${PIPESTATUS[0]}
+if [ "$IMPORT_EXIT" -ne 0 ]; then
+    BOOT_LOG "FATAL: 模块导入失败（退出码 $IMPORT_EXIT）。请检查上方 [IMPORT] 错误。"
+    exit 1
+fi
+BOOT_LOG "模块导入全部成功 ✅"
+
+# ── 3. 启动 uvicorn（前台，输出直通）──────────────────────
+BOOT_LOG "启动 uvicorn → 0.0.0.0:9000"
+BOOT_LOG "（CloudBase 网关将代理外部请求到此端口）"
+
+exec "$PYTHON" -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 9000 \
     --workers 1 \
     --timeout-keep-alive 30 \
-    --log-level info
+    --log-level info \
+    --no-access-log
