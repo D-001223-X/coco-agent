@@ -117,14 +117,16 @@ export default function ProfilePage() {
           >
             💡 联系客服
           </Link>
-          {isAdminUser(user_id) && (
-            <Link
-              to="/admin"
-              className="block bg-white rounded-card border border-gray-100 shadow-sm p-4 text-sm text-gray-700 hover:border-coral/40 transition-colors"
-            >
-              ⚙️ 管理后台
-            </Link>
-          )}
+          {/* P4 需求澄清：所有用户（含访客）可见管理后台入口，访客只读、管理员全功能 */}
+          <Link
+            to="/admin"
+            className="block bg-white rounded-card border border-gray-100 shadow-sm p-4 text-sm text-gray-700 hover:border-coral/40 transition-colors"
+          >
+            ⚙️ 管理后台
+            {!isAdminUser(user_id) && (
+              <span className="ml-2 text-xs text-amber-600">只读模式</span>
+            )}
+          </Link>
           {!isGuest && (
             <button
               onClick={logout}

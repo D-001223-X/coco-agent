@@ -5,7 +5,11 @@ import { useChatStore } from "../../../store/chatStore";
 import { useSessionStore } from "../../../store/sessionStore";
 
 
-export function ChatArea() {
+interface ChatAreaProps {
+  onOpenHistory?: () => void;
+}
+
+export function ChatArea({ onOpenHistory }: ChatAreaProps) {
   const currentSessionId = useSessionStore((state) => state.currentSessionId);
   const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
   const loadSessions = useSessionStore((state) => state.loadSessions);
@@ -36,12 +40,19 @@ export function ChatArea() {
 
   return (
     <div className="flex-1 flex flex-col bg-warmwhite">
-      <div className="h-14 px-6 bg-white border-b border-gray-100 flex items-center shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800">
+      <div className="h-14 px-3 md:px-6 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm">
+        <h2 className="text-base font-semibold text-gray-800 truncate">
           {currentSessionId
             ? `会话 ${currentSessionId.slice(0, 8)}`
             : "请选择或新建会话"}
         </h2>
+        {/* P3 移动端历史入口（桌面用侧栏）*/}
+        <button
+          onClick={onOpenHistory}
+          className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          📋 历史
+        </button>
       </div>
       <MessageList messages={messages} isLoading={isLoading} />
       <MessageInput onSend={handleSend} disabled={isLoading} />

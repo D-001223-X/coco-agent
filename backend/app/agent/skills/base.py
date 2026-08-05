@@ -169,6 +169,25 @@ class BaseSkill(ABC):
                 break
         return {"reply": reply, "correction": correction}
 
+    @staticmethod
+    def validate_correction(
+        correction: dict[str, Any] | None,
+        user_message: str,
+    ) -> dict[str, Any] | None:
+        """纠错防线：仅保留针对「当前最新消息」的纠错。
+
+        若 LLM 对历史旧内容纠错（original 不在当前消息中），丢弃之，
+        避免出现“针对旧的内容纠错”的错位体验（P1 修复）。
+        """
+        if not correction:
+            return None
+        orig = str(correction.get("original", "")).strip()
+        if not orig:
+            return None
+        if orig not in user_message:
+            return None
+        return correction
+
     def build_react_loop(
         self,
         user_message: str,

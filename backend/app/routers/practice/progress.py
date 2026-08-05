@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,9 +38,28 @@ class FeedbackRequest(BaseModel):
 
 
 @router.get("")
-async def get_progress(user: OptUserDep, db: DbDep):
-    """获取用户学习进度统计（访客无登录 → 返回完整空结构，前端安全渲染）。"""
+async def get_progress(
+    user: OptUserDep,
+    db: DbDep,
+    x_device_id: Annotated[str | None, Header(alias="X-Device-ID")] = None,
+):
+    """获取学习进度统计。
+
+    - 登录用户：按 user.id 查记录
+    - 访客：按 X-Device-ID（设备）查记录（P2：进度按设备隔离统计）
+    - 无身份：完整空结构
+    """
+    # 访客：按设备查 records 计算真实进度
     if user is None:
+        device_id = (x_device_id or "").strip()
+        if device_id:
+            try:
+                records = await _progress_service.load_records(db, device_id)
+                progress = _progress_service.calculate_progress(device_id, records)
+                return {"code": 0, "data": progress, "msg": "success"}
+            except Exception as exc:
+                logger.error("get_progress(guest) failed: %s", exc)
+                return {"code": 500, "data": None, "msg": f"获取进度失败: {exc}"}
         empty = {
             "userId": "guest",
             "totalDays": 0,

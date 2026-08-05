@@ -41,6 +41,7 @@ ROLEPLAY_SYSTEM_PROMPT = """\
 1. 用户出现语法/用词/表达错误时，温和指出并给出正确表达，格式："Good try! Actually, we say '...'"
 2. 如果用户表达正确，给予简短肯定（如 "Great!" / "Nice!"），可顺带提供一个更地道的说法
 3. 先肯定再纠正，不要打击用户信心
+4. ⚠️ 只针对用户最新发送的这条消息纠错，绝对不要对历史对话中的旧内容纠错
 
 ## 输出格式
 第一行：你的对话回复（1-2句）
@@ -104,7 +105,7 @@ class RolePlaySkill(BaseSkill):
         parsed = self.parse_reply(raw)
 
         reply = parsed["reply"] or "Sorry, could you say that again?"
-        correction = parsed.get("correction")
+        correction = self.validate_correction(parsed.get("correction"), user_message)
         agent_thought = (
             f"角色扮演[{cfg['name']}]({cfg['role']})，"
             f"用户等级{self.user_level}，难度{cfg['difficulty']}，"

@@ -26,36 +26,14 @@ const PLAN_KEY = "learningPlan";
 const GOALS_KEY = "learningGoals";
 const SESSION_KEY = "practiceSession";
 
+import { getDeviceId as getGlobalDeviceId } from "../utils/deviceId";
+
 // 统一取用户标识：已登录 → 用户 ID；访客 → 设备 ID（进度/反馈按此隔离）
+// P2 修复：访客统一用全局 device_id（utils/deviceId，与 X-Device-ID 头一致），
+// 保证会话记录归属与进度查询使用同一个设备标识。
 export function currentUserId(): string {
   const uid = useAuthStore.getState().user_id;
-  return uid != null ? String(uid) : getDeviceId();
-}
-
-// 访客设备 ID（基于浏览器指纹，不同设备天然隔离）
-export function getDeviceId(): string {
-  let deviceId = localStorage.getItem("deviceId");
-  if (!deviceId) {
-    const fingerprint = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width,
-      screen.height,
-      screen.colorDepth,
-    ].join("|");
-    // 简易 hash → 稳定短 ID
-    let h = 0;
-    for (let i = 0; i < fingerprint.length; i++) {
-      h = (Math.imul(31, h) + fingerprint.charCodeAt(i)) | 0;
-    }
-    deviceId =
-      "dev_" +
-      (h >>> 0).toString(16).padStart(8, "0") +
-      "_" +
-      Date.now().toString(36);
-    localStorage.setItem("deviceId", deviceId);
-  }
-  return deviceId;
+  return uid != null ? String(uid) : getGlobalDeviceId();
 }
 
 // ── Flatten questions with their section ─────────────────
