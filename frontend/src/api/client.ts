@@ -36,10 +36,15 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // 访客模式修复：仅当「曾登录过（本地有 token）」才跳登录（会话过期场景）；
+      // 访客 401（如无 X-Device-ID）静默处理，不强制跳转登录页。
+      const hadToken = !!localStorage.getItem("token");
       // 同步清除 Zustand persist 的存储，防止死循环
       localStorage.removeItem("token");
       localStorage.removeItem("auth-storage");
-      window.location.href = "/login";
+      if (hadToken) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

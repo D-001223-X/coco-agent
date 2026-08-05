@@ -14,8 +14,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.models import User
-from app.routers.auth import get_current_user
 from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
@@ -26,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/practice", tags=["practice-session"])
 
-UserDep = Annotated[User, Depends(get_current_user)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 _session_service = SessionService()
@@ -54,13 +51,13 @@ class SwitchScenarioRequest(BaseModel):
 
 
 @router.get("/modes")
-async def get_modes(_user: UserDep):
+async def get_modes():
     """返回可用陪练模式及场景列表。"""
     return {"code": 0, "data": {"modes": get_available_modes()}, "msg": "success"}
 
 
 @router.post("/session/start")
-async def start_session(req: StartSessionRequest, _user: UserDep):
+async def start_session(req: StartSessionRequest):
     """开始新的陪练会话。"""
     try:
         session, greeting = _session_service.start_session(
@@ -80,7 +77,7 @@ async def start_session(req: StartSessionRequest, _user: UserDep):
 
 
 @router.post("/session/chat")
-async def chat(req: ChatRequest, _user: UserDep):
+async def chat(req: ChatRequest):
     """处理用户消息。"""
     try:
         result = await _session_service.chat(req.sessionId, req.message)
@@ -103,7 +100,7 @@ async def chat(req: ChatRequest, _user: UserDep):
 
 
 @router.post("/session/end")
-async def end_session(req: EndSessionRequest, _user: UserDep, db: DbDep):
+async def end_session(req: EndSessionRequest, db: DbDep):
     """结束会话并持久化记录。"""
     session = await _session_service.end_session_async(req.sessionId, db=db)
     return {
@@ -114,7 +111,7 @@ async def end_session(req: EndSessionRequest, _user: UserDep, db: DbDep):
 
 
 @router.post("/session/switch")
-async def switch_scenario(req: SwitchScenarioRequest, _user: UserDep):
+async def switch_scenario(req: SwitchScenarioRequest):
     """切换会话的场景/话题（保留历史上下文，T-005）。"""
     try:
         session, new_greeting = _session_service.switch_scenario(

@@ -16,14 +16,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.config import get_settings
-from app.models import User
-from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/practice/plan", tags=["practice-plan"])
 
-UserDep = Annotated[User, Depends(get_current_user)]
 
 # 计划生成 System Prompt（CEFR 规则来自知识库）
 # MARKER: PLAN_PROMPT_START
@@ -79,7 +76,7 @@ class PlanGenerateIn(BaseModel):
 
 
 @router.post("/generate")
-async def generate_plan(body: PlanGenerateIn, _user: UserDep):
+async def generate_plan(body: PlanGenerateIn):
     """根据测评结果 + 用户目标生成学习计划（DeepSeek）。"""
     s = get_settings()
     if not s.dashscope_api_key:

@@ -106,13 +106,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
       )}
 
-      {/* 只读模式横幅（T-003：访客/非管理员）*/}
+      {/* 只读模式横幅（T-003：访客/非管理员）— R-001 隐藏登录入口，不提供显式跳转链接 */}
       {isReadOnly && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-xs md:text-sm text-amber-700">
           演示模式 — 仅可查看，编辑操作已禁用。
-          <Link to="/login" className="ml-1 underline font-semibold">
-            登录管理员账号解锁编辑
-          </Link>
         </div>
       )}
 

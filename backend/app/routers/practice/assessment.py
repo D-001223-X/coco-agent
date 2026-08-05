@@ -18,14 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import User
-from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/practice/assessment", tags=["practice-assessment"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-UserDep = Annotated[User, Depends(get_current_user)]
 
 # CEFR 等级映射（总分 46 分）
 _CEFR_MAP: list[tuple[int, str, str]] = [

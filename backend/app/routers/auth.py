@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -150,3 +150,27 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_optional_current_user(
+    db: AsyncSession = Depends(get_db),
+    authorization: Annotated[str | None, Header()] = None,
+) -> User | None:
+    """可选认证：有有效 JWT → User；无/无效 token → None（不抛 401）。
+
+    访客模式（R-002/003/练习模块）使用：登录用户返回身份，访客返回 None，
+    接口内部自行决定如何为访客提供数据。
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    try:
+        token = authorization.split(" ", 1)[1].strip()
+        s = get_settings()
+        payload = jwt.decode(token, s.secret_key, algorithms=[s.algorithm])
+        email: str | None = payload.get("sub")
+        if email is None:
+            return None
+    except JWTError:
+        return None
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import User
-from app.routers.auth import get_current_user
+from app.routers.auth import get_optional_current_user
 from app.services.practice.feedback_service import FeedbackService
 from app.services.practice.progress_service import ProgressService
 
@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/practice/progress", tags=["practice-progress"])
 
-UserDep = Annotated[User, Depends(get_current_user)]
+# 访客模式：可选认证（有 token 用登录用户，无 token 为访客）
+OptUserDep = Annotated[User | None, Depends(get_optional_current_user)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 _progress_service = ProgressService()
@@ -37,9 +38,11 @@ class FeedbackRequest(BaseModel):
 
 
 @router.get("")
-async def get_progress(_user: UserDep, db: DbDep):
-    """获取用户学习进度统计。"""
-    user_id = str(_user.id)
+async def get_progress(user: OptUserDep, db: DbDep):
+    """获取用户学习进度统计（访客无登录 → 返回空进度，不报错）。"""
+    if user is None:
+        return {"code": 0, "data": {"totalRounds": 0, "avgScore": 0, "records": []}, "msg": "success"}
+    user_id = str(user.id)
     try:
         records = await _progress_service.load_records(db, user_id)
         progress = _progress_service.calculate_progress(user_id, records)
@@ -50,14 +53,12 @@ async def get_progress(_user: UserDep, db: DbDep):
 
 
 @router.post("/feedback")
-async def generate_feedback(req: FeedbackRequest, _user: UserDep, db: DbDep):
-    """基于进度数据生成智能反馈。
-
-    数据源与 GET /progress 统一：均使用登录用户 ID 查询
-    ``practice_session_records``，避免仪表板与建议数据不一致。
-    """
+async def generate_feedback(req: FeedbackRequest, user: OptUserDep, db: DbDep):
+    """基于进度数据生成智能反馈（访客 → 返回默认提示）。"""
+    if user is None:
+        return {"code": 0, "data": {"feedback": "完成一次陪练后，我将为你生成学习反馈～"}, "msg": "success"}
     try:
-        user_id = str(_user.id)
+        user_id = str(user.id)
         records = await _progress_service.load_records(db, user_id)
         progress = _progress_service.calculate_progress(user_id, records)
         feedback = await _feedback_service.generate_feedback(
