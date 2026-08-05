@@ -119,6 +119,7 @@ class LLMService:
         intent: str,
         trace_id: str | None = None,
         reference_candidates: list[dict] | None = None,
+        device_id: str | None = None,
     ) -> dict[str, Any]:
         """Generate a response based on *intent*, *chunks* and *query*.
 
@@ -173,6 +174,7 @@ class LLMService:
                 duration_ms=duration_ms,
                 service=service_name,
                 status=status,
+                device_id=device_id,
             )
         except Exception as log_exc:
             logger.warning("log_node scheduling failed: %s", log_exc)

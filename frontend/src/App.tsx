@@ -4,12 +4,12 @@ import {
   Routes,
   Route,
   Navigate,
-  useLocation,
 } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
 import LogsPage from "./pages/LogsPage";
+import SessionsPage from "./pages/SessionsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminIndexPage from "./pages/Admin/AdminIndexPage";
 import KnowledgeAdminPage from "./pages/Admin/KnowledgeAdminPage";
@@ -61,18 +61,9 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
 }
 
 // ── 路由守卫（T-访客模式）───────────────────────────────
-// /practice/* 为访客路线（扫码即用，无需登录）
-// /admin/* 需登录（且后端校验 admin 角色）
-// 其余（/chat /logs /profile）需登录
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((state) => state.token);
-  const location = useLocation();
-  if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-  return <>{children}</>;
-}
-
+// 全站访客开放：/practice/*、/chat、/sessions、/logs 扫码即用；
+// /admin/* 访客只读（后端 admin_read_guest_ok 兜底写 403）。
+// 登录入口：/login（通过「我的」页连击 5 次进入，R-001）
 function App() {
   const token = useAuthStore((state) => state.token);
 
@@ -101,15 +92,9 @@ function App() {
           {/* 访客客服：/chat 无需登录（T-002，deviceId 标识访客）*/}
           <Route path="/chat" element={<ChatPage />} />
 
-          {/* 需登录：日志/管理后台 */}
-          <Route
-            path="/logs"
-            element={
-              <RequireAuth>
-                <LogsPage />
-              </RequireAuth>
-            }
-          />
+          {/* R-002/R-003 访客可查看会话列表与日志（无需登录）*/}
+          <Route path="/sessions" element={<SessionsPage />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route
             path="/admin"
             element={

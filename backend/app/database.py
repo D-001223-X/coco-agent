@@ -122,33 +122,31 @@ async def init_db(database_url: str | None = None) -> None:
         await conn.run_sync(Base.metadata.create_all)
 
         # ── 1b. 增量迁移：给旧表补列（create_all 不会改已存在的表）──
-        # P-002: sessions.device_id（访客设备标识）
-        if not is_sqlite:
+        # P-002/R-003: sessions.device_id + logs.device_id（访客设备标识）
+        for table in ("sessions", "logs"):
             try:
-                # MySQL: 检查列是否存在，不存在则 ALTER 添加
-                insp = await conn.run_sync(
-                    lambda sync_conn: inspect(sync_conn).get_columns("sessions")
-                )
-                has_device = any(c["name"] == "device_id" for c in insp)
-                if not has_device:
-                    await conn.execute(
-                        text("ALTER TABLE sessions ADD COLUMN device_id VARCHAR(64) NULL")
+                if is_sqlite:
+                    cols = await conn.execute(
+                        text(f"PRAGMA table_info({table})")
                     )
-                    logger.info("Migration: sessions.device_id added")
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Migration sessions.device_id skipped: %s", exc)
-        else:
-            # SQLite: 简单检测 + ALTER（幂等）
-            try:
-                cols = await conn.execute(text("PRAGMA table_info(sessions)"))
-                names = [r[1] for r in cols.fetchall()]
-                if "device_id" not in names:
-                    await conn.execute(
-                        text("ALTER TABLE sessions ADD COLUMN device_id VARCHAR(64)")
+                    names = [r[1] for r in cols.fetchall()]
+                    if "device_id" not in names:
+                        await conn.execute(
+                            text(f"ALTER TABLE {table} ADD COLUMN device_id VARCHAR(64)")
+                        )
+                        logger.info("Migration: %s.device_id added (sqlite)", table)
+                else:
+                    insp = await conn.run_sync(
+                        lambda sync_conn, t=table: inspect(sync_conn).get_columns(t)
                     )
-                    logger.info("Migration: sessions.device_id added (sqlite)")
+                    has_device = any(c["name"] == "device_id" for c in insp)
+                    if not has_device:
+                        await conn.execute(
+                            text(f"ALTER TABLE {table} ADD COLUMN device_id VARCHAR(64) NULL")
+                        )
+                        logger.info("Migration: %s.device_id added", table)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Migration sessions.device_id skipped: %s", exc)
+                logger.warning("Migration %s.device_id skipped: %s", table, exc)
 
         # ── 2. FTS5 virtual table（仅 SQLite）───────────────
         # MySQL/CloudBase 云数据库无 FTS5：跳过，检索走 FAISS 向量 + Python 关键词。

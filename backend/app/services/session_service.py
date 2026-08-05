@@ -60,6 +60,76 @@ class SessionService:
         ]
 
     @staticmethod
+    async def list_all_sessions(db: AsyncSession) -> list[dict]:
+        """R-002：管理员查看全部会话（newest first）。"""
+        count_subq = (
+            select(
+                Message.session_id,
+                func.count(Message.id).label("msg_count"),
+            )
+            .group_by(Message.session_id)
+            .subquery()
+        )
+        stmt = (
+            select(
+                Session.id,
+                Session.created_at,
+                Session.updated_at,
+                func.coalesce(count_subq.c.msg_count, 0).label("message_count"),
+            )
+            .outerjoin(count_subq, Session.id == count_subq.c.session_id)
+            .order_by(Session.updated_at.desc())
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "session_id": row.id,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                "message_count": row.message_count,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def list_device_sessions(
+        db: AsyncSession,
+        device_id: str,
+    ) -> list[dict]:
+        """R-002：访客查看自己设备的会话（newest first）。"""
+        count_subq = (
+            select(
+                Message.session_id,
+                func.count(Message.id).label("msg_count"),
+            )
+            .group_by(Message.session_id)
+            .subquery()
+        )
+        stmt = (
+            select(
+                Session.id,
+                Session.created_at,
+                Session.updated_at,
+                func.coalesce(count_subq.c.msg_count, 0).label("message_count"),
+            )
+            .outerjoin(count_subq, Session.id == count_subq.c.session_id)
+            .where(Session.device_id == device_id)
+            .order_by(Session.updated_at.desc())
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "session_id": row.id,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                "message_count": row.message_count,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
     async def get_session_messages(
         db: AsyncSession,
         session_id: str,
@@ -103,12 +173,29 @@ class SessionService:
     async def validate_session_owner(
         db: AsyncSession,
         session_id: str,
-        user_id: int,
+        user_id: int | None = None,
+        device_id: str | None = None,
+        is_admin: bool = False,
     ) -> Session | None:
-        """Return the Session if it exists and belongs to *user_id*, else None."""
-        stmt = select(Session).where(
-            Session.id == session_id,
-            Session.user_id == user_id,
-        )
+        """Return the Session if accessible by the identity, else None.
+
+        - 管理员 → 任意会话
+        - 登录用户 → user_id 匹配
+        - 访客 → device_id 匹配
+        """
+        if is_admin:
+            stmt = select(Session).where(Session.id == session_id)
+        elif user_id is not None:
+            stmt = select(Session).where(
+                Session.id == session_id,
+                Session.user_id == user_id,
+            )
+        elif device_id:
+            stmt = select(Session).where(
+                Session.id == session_id,
+                Session.device_id == device_id,
+            )
+        else:
+            return None
         result = await db.execute(stmt)
         return result.scalar_one_or_none()

@@ -160,6 +160,10 @@ class Log(Base):
     session_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, default=None
     )
+    # R-003 访客日志隔离：设备标识（访客日志按 device_id 归属）
+    device_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, default=None, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

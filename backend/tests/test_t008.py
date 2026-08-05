@@ -153,12 +153,9 @@ async def test_get_messages_not_found(client, auth_context):
     assert resp.status_code == 404
 
 
-# ── Test 5: Other user's session → 403 ────────────────────
+# ── Test 5: Other user's session → 管理员可看（R-002）──
 async def test_get_messages_forbidden(client, auth_context):
-    """Querying a session owned by another user should return 403.
-
-    We create a session belonging to user_id=999 (not the admin).
-    """
+    """R-002：管理员登录后可查看任意会话（不再 403）。"""
     async with auth_context["factory"]() as session:
         session.add(Session(id="sess-other", user_id=999))
         await session.commit()
@@ -167,4 +164,5 @@ async def test_get_messages_forbidden(client, auth_context):
         "/api/sessions/sess-other/messages",
         headers={"Authorization": f"Bearer {auth_context['token']}"},
     )
-    assert resp.status_code == 403
+    # admin(user_id=1) → is_admin=True → 可访问任意会话
+    assert resp.status_code == 200

@@ -18,8 +18,14 @@ class LogService:
     """Read-only log queries for the logs router."""
 
     @staticmethod
-    async def list_traces(db: AsyncSession) -> list[dict]:
+    async def list_traces(
+        db: AsyncSession,
+        user_id: int | None = None,
+        device_id: str | None = None,
+    ) -> list[dict]:
         """Return one summary row per trace_id, newest first.
+
+        R-003：可按 user_id（登录用户）或 device_id（访客）过滤。
 
         Each entry contains:
           - id: latest log's pk
@@ -29,6 +35,13 @@ class LogService:
           - intent: inferred from the ``intent_recognition`` node's output_data
           - created_at: latest log's timestamp
         """
+        # 过滤条件
+        filters = []
+        if user_id is not None:
+            filters.append(Log.user_id == user_id)
+        if device_id:
+            filters.append(Log.device_id == device_id)
+
         # Subquery: latest id (pk) per trace_id
         latest_per_trace = (
             select(
@@ -49,6 +62,8 @@ class LogService:
             )
             .order_by(Log.id.desc())
         )
+        if filters:
+            stmt = stmt.where(*filters)
 
         result = await db.execute(stmt)
         latest_rows = result.scalars().all()
@@ -112,8 +127,11 @@ class LogService:
     async def get_trace_detail(
         db: AsyncSession,
         trace_id: str,
+        user_id: int | None = None,
+        device_id: str | None = None,
+        is_admin: bool = False,
     ) -> dict[str, Any]:
-        """Return full chain detail for a *trace_id*.
+        """Return full chain detail for a *trace_id* (R-003 归属过滤).
 
         Returns ``{"trace_id": ..., "user_id": ..., "nodes": [...]}``.
         """
@@ -122,6 +140,13 @@ class LogService:
             .where(Log.trace_id == trace_id)
             .order_by(Log.created_at.asc())
         )
+        if not is_admin:
+            if user_id is not None:
+                stmt = stmt.where(Log.user_id == user_id)
+            elif device_id:
+                stmt = stmt.where(Log.device_id == device_id)
+            else:
+                return {"trace_id": trace_id, "user_id": None, "nodes": []}
         result = await db.execute(stmt)
         logs = result.scalars().all()
 

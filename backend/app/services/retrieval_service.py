@@ -160,6 +160,7 @@ class RetrievalService:
         threshold: float | None = None,
         trace_id: str | None = None,
         sections: list[str] | None = None,
+        device_id: str | None = None,
     ) -> list[RetrievedChunk]:
         """Hybrid search: FAISS + FTS5 → RRF → threshold → top_k.
 
@@ -247,6 +248,7 @@ class RetrievalService:
                 duration_ms=duration_ms,
                 service="FAISS+FTS5+RRF",
                 status=status,
+                device_id=device_id,
             )
         except Exception as log_exc:
             logger.warning("log_node scheduling failed: %s", log_exc)

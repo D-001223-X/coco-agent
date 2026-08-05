@@ -189,7 +189,7 @@ async def chat(
 
         # ── 3. Intent recognition ──────────────────────────────
         intent_result = await _intent_service.recognize(
-            request.message, history, trace_id=trace_id,
+            request.message, history, trace_id=trace_id, device_id=identity.device_id,
         )
 
         # ── 4. Route ─────────────────────────────────────────
@@ -224,12 +224,13 @@ async def chat(
                 threshold=0.15 if is_feedback else s.score_threshold,
                 trace_id=trace_id,
                 sections=intent_result.related_sections,
+                device_id=identity.device_id,
             )
             if retrieved:
                 doc_texts = [c.content for c in retrieved]
                 reranked = await _rerank_service.rerank(
                     intent_result.resolved_question, doc_texts, top_k=3,
-                    trace_id=trace_id,
+                    trace_id=trace_id, device_id=identity.device_id,
                 )
                 # Map reranked docs back to RetrievedChunk objects
                 doc_to_chunk = {c.content: c for c in retrieved}
@@ -249,6 +250,7 @@ async def chat(
             intent=llm_intent,
             trace_id=trace_id,
             reference_candidates=intent_result.reference_candidates,
+            device_id=identity.device_id,
         )
 
         # ── 5. Persist messages ──────────────────────────────
@@ -305,6 +307,7 @@ async def chat(
             status="error",
             user_id=identity.user_id if identity.user_id is not None else 0,
             session_id=request.session_id,
+            device_id=identity.device_id,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

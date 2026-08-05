@@ -195,6 +195,7 @@ class IntentService:
         query: str,
         history: list[dict[str, str]] | None = None,
         trace_id: str | None = None,
+        device_id: str | None = None,
     ) -> IntentResult:
         """Classify *query* intent, resolving coreferences from *history*.
 
@@ -248,6 +249,7 @@ class IntentService:
                 duration_ms=duration_ms,
                 service="intent",
                 status=status,
+                device_id=device_id,
             )
         except Exception as log_exc:
             # log_node itself is fail-silent, but guard anyway

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { MainLayout } from "../../components/Layout/MainLayout";
 import { TraceDrawer } from "./TraceDrawer";
 import { useLogStore } from "../../store/logStore";
-import { useRequireAuth } from "../../hooks/useAuth";
 import type { LogItem } from "../../types";
 
 function formatTime(iso: string) {
@@ -17,8 +16,7 @@ function formatTime(iso: string) {
 }
 
 export default function LogsPage() {
-  useRequireAuth();
-
+  // R-003：访客可查看自己设备的日志（无需登录）
   const logs = useLogStore((state) => state.logs);
   const isLoading = useLogStore((state) => state.isLoading);
   const currentTrace = useLogStore((state) => state.currentTrace);

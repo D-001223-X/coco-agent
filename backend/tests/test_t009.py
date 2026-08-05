@@ -183,11 +183,13 @@ async def test_get_trace_not_found(client, auth_context):
     assert data["nodes"] == []
 
 
-# ── Test 4: No auth token → 401 ────────────────────────────
+# ── Test 4: No auth token → 200 空列表（R-003 访客无身份时返回空）──
 async def test_logs_no_token(client):
-    """Request without JWT should return 401."""
+    """无 token 无 device → 200 + 空列表（不再 401）。"""
     resp = await client.get("/api/logs")
-    assert resp.status_code == 401
+    assert resp.status_code == 200
+    assert resp.json()["logs"] == []
 
     resp = await client.get("/api/logs/some-trace")
-    assert resp.status_code == 401
+    assert resp.status_code == 200
+    assert resp.json()["nodes"] == []

@@ -21,7 +21,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(email, password);
-      navigate("/chat", { replace: true });
+      navigate("/profile", { replace: true });  // R-001：登录后回「我的」显示管理员标识
     } catch (err) {
       setError("登录失败，请检查邮箱和密码");
     } finally {

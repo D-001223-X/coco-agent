@@ -22,6 +22,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const navItems = [
     { path: "/chat", label: "聊天" },
+    { path: "/sessions", label: "会话" },
     { path: "/logs", label: "日志" },
   ];
   // T-007：仅管理员可见管理后台入口（访客/普通用户隐藏；直接输 URL 可进只读模式）

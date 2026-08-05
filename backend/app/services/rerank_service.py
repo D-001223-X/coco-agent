@@ -40,6 +40,7 @@ class RerankService:
         documents: list[str],
         top_k: int = 3,
         trace_id: str | None = None,
+        device_id: str | None = None,
     ) -> list[tuple[str, float]]:
         """Rerank *documents* against *query*, return top-*k* results.
 
@@ -97,6 +98,7 @@ class RerankService:
                 duration_ms=duration_ms,
                 service="qwen3-rerank",
                 status=status,
+                device_id=device_id,
             )
         except Exception as log_exc:
             logger.warning("log_node scheduling failed: %s", log_exc)

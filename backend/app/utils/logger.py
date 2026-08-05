@@ -31,6 +31,7 @@ async def _write_log(
     status: str,
     user_id: int | None,
     session_id: str | None,
+    device_id: str | None = None,
 ) -> None:
     """Internal coroutine: opens a session and inserts the log row.
 
@@ -51,10 +52,10 @@ async def _write_log(
         """
         INSERT INTO logs
             (trace_id, node, input_data, output_data,
-             duration_ms, service, status, user_id, session_id)
+             duration_ms, service, status, user_id, session_id, device_id)
         VALUES
             (:trace_id, :node, :input_data, :output_data,
-             :duration_ms, :service, :status, :user_id, :session_id)
+             :duration_ms, :service, :status, :user_id, :session_id, :device_id)
         """
     )
 
@@ -71,6 +72,7 @@ async def _write_log(
                 "status": status,
                 "user_id": user_id,
                 "session_id": session_id,
+                "device_id": device_id,
             },
         )
         await session.commit()
@@ -86,6 +88,7 @@ def log_node(
     status: str = "ok",
     user_id: int | None = None,
     session_id: str | None = None,
+    device_id: str | None = None,
 ) -> asyncio.Task:
     """Fire-and-forget async log writer.
 
@@ -114,6 +117,8 @@ def log_node(
         Associated user ID (nullable).
     session_id : str | None
         Associated session ID (nullable).
+    device_id : str | None
+        Associated device ID for guest logs (nullable, R-003).
 
     Returns
     -------
@@ -138,6 +143,7 @@ def log_node(
             status=status,
             user_id=user_id,
             session_id=session_id,
+            device_id=device_id,
         )
     )
 
