@@ -39,9 +39,24 @@ class FeedbackRequest(BaseModel):
 
 @router.get("")
 async def get_progress(user: OptUserDep, db: DbDep):
-    """获取用户学习进度统计（访客无登录 → 返回空进度，不报错）。"""
+    """获取用户学习进度统计（访客无登录 → 返回完整空结构，前端安全渲染）。"""
     if user is None:
-        return {"code": 0, "data": {"totalRounds": 0, "avgScore": 0, "records": []}, "msg": "success"}
+        empty = {
+            "userId": "guest",
+            "totalDays": 0,
+            "totalSessions": 0,
+            "totalRounds": 0,
+            "totalCorrections": 0,
+            "strengths": ["暂无高频错误记录"],
+            "weaknesses": [],
+            "errorPatterns": {"grammar": 0, "vocabulary": 0, "pronunciation": 0},
+            "errorExamples": [],
+            "dailyLogs": [],
+            "activeDays7": 0,
+            "activeDays30": 0,
+            "updatedAt": None,
+        }
+        return {"code": 0, "data": empty, "msg": "success"}
     user_id = str(user.id)
     try:
         records = await _progress_service.load_records(db, user_id)

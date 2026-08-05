@@ -170,7 +170,7 @@ export default function ProgressPage() {
         {/* 薄弱环节 */}
         <div className="bg-white rounded-card border border-gray-100 shadow-sm p-6 mb-8">
           <h2 className="text-base font-semibold text-gray-800 mb-4">薄弱环节</h2>
-          {progress && progress.weaknesses.length > 0 ? (
+          {progress && (progress.weaknesses?.length ?? 0) > 0 ? (
             <div>
               <div className="flex gap-2 mb-3 flex-wrap">
                 {progress.weaknesses.map((w) => (
@@ -179,7 +179,7 @@ export default function ProgressPage() {
                   </span>
                 ))}
               </div>
-              {progress.errorExamples.length > 0 && (
+              {(progress.errorExamples?.length ?? 0) > 0 && (
                 <div className="space-y-2">
                   {progress.errorExamples.slice(0, 3).map((ex, i) => (
                     <div key={i} className="bg-warmwhite rounded-lg p-3 text-xs">
