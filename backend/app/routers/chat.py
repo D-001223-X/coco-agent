@@ -6,7 +6,6 @@ only orchestrates and handles HTTP concerns (auth, serialisation, errors).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import uuid
 from typing import Annotated, Any
 
@@ -263,8 +262,8 @@ async def chat(
         db.add(user_msg)
         await db.flush()
 
-        # Touch session updated_at
-        current_session.updated_at = datetime.now(timezone.utc)
+        # Session updated_at 由模型 onupdate=func.now() 自动刷新
+        # （与 created_at 同源，避免 UTC/本地混用导致前端差 8 小时）
 
         # Assistant response
         assistant_msg = Message(
