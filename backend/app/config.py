@@ -64,7 +64,8 @@ class Settings(BaseSettings):
         return self.chunks_meta_path
 
     # ── Model identifiers ───────────────────────────────────
-    deepseek_model: str = "deepseek-v3"
+    # DEEPSEEK_MODEL=v4-flash 正式版（2026-08-06 切换，由 deepseek-v3 升级）
+    deepseek_model: str = "deepseek-v4-flash-0731"
     embedding_model: str = "text-embedding-v3"
     rerank_model: str = "qwen3-rerank"
 
