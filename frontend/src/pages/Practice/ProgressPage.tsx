@@ -63,6 +63,7 @@ export default function ProgressPage() {
 
   const handleGenerateFeedback = async () => {
     setFeedbackLoading(true);
+    setError("");
     const assessment = loadStoredAssessment();
     try {
       // 后端以登录用户为准（与 GET /progress 数据源统一），前端无需传 userId
@@ -216,9 +217,8 @@ export default function ProgressPage() {
           ) : (
             <p className="text-gray-500 text-sm">点击按钮，AI 将根据你的学习数据生成个性化建议。</p>
           )}
+          {error && <p className="text-sm text-coral mt-3 font-medium">{error}</p>}
         </div>
-
-        {error && <p className="text-sm text-coral mt-4">{error}</p>}
       </div>
     </MainLayout>
   );

@@ -178,13 +178,16 @@ class BaseSkill(ABC):
 
         若 LLM 对历史旧内容纠错（original 不在当前消息中），丢弃之，
         避免出现“针对旧的内容纠错”的错位体验（P1 修复）。
+
+        注意：使用大小写不敏感匹配——LLM 常把 original 规范化为小写，
+        而用户输入可能含大写，避免误杀合法纠错（P5 修复）。
         """
         if not correction:
             return None
         orig = str(correction.get("original", "")).strip()
         if not orig:
             return None
-        if orig not in user_message:
+        if orig.lower() not in user_message.lower():
             return None
         return correction
 

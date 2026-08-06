@@ -87,14 +87,33 @@ async def get_progress(
 
 
 @router.post("/feedback")
-async def generate_feedback(req: FeedbackRequest, user: OptUserDep, db: DbDep):
-    """基于进度数据生成智能反馈（访客 → 返回默认提示）。"""
-    if user is None:
-        return {"code": 0, "data": {"feedback": "完成一次陪练后，我将为你生成学习反馈～"}, "msg": "success"}
+async def generate_feedback(
+    req: FeedbackRequest,
+    user: OptUserDep,
+    db: DbDep,
+    x_device_id: Annotated[str | None, Header(alias="X-Device-ID")] = None,
+):
+    """基于进度数据生成智能反馈。
+
+    - 登录用户：按 user.id 查记录生成
+    - 访客：按 X-Device-ID 查记录生成（P5：访客也有真实反馈）
+    - 无数据：返回引导文案
+    """
     try:
-        user_id = str(user.id)
-        records = await _progress_service.load_records(db, user_id)
-        progress = _progress_service.calculate_progress(user_id, records)
+        if user is not None:
+            uid = str(user.id)
+            records = await _progress_service.load_records(db, uid)
+        else:
+            device_id = (x_device_id or "").strip()
+            if not device_id:
+                return {"code": 0, "data": {"feedback": "完成一次陪练后，我将为你生成学习反馈～"}, "msg": "success"}
+            uid = device_id
+            records = await _progress_service.load_records(db, device_id)
+
+        if not records:
+            return {"code": 0, "data": {"feedback": "完成一次陪练后，我将为你生成学习反馈～"}, "msg": "success"}
+
+        progress = _progress_service.calculate_progress(uid, records)
         feedback = await _feedback_service.generate_feedback(
             progress, req.userLevel
         )

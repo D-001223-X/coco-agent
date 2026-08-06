@@ -120,7 +120,8 @@ class ProgressService:
             )
             top_count = sorted_types[0][1]
             for etype, count in sorted_types:
-                if count > 2 or (total_errors >= 3 and count == top_count and count >= 2):
+                # P5 优化：只要有纠错记录就显示最高频薄弱项（原条件需 3+ 次同类错误，过严）
+                if count == top_count and count >= 1:
                     weaknesses.append(_ERROR_LABELS.get(etype, etype))
 
         # 强项：错误最少的维度（无错误时默认阅读）
