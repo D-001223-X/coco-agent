@@ -57,8 +57,12 @@ def get_engine() -> AsyncEngine:
                 "max_overflow": 10,
                 "pool_recycle": 3600,
                 "pool_pre_ping": True,   # 借用前 ping 检测死连接，避免挂起
-                # aiomysql 通过 connect_args 传连接超时（秒）
-                "connect_args": {"connect_timeout": 10},
+                # aiomysql 通过 connect_args 传连接超时（秒）+ 强制 utf8mb4
+                # （emoji 4 字节需 utf8mb4，否则写入报 1366 DataError）
+                "connect_args": {
+                    "connect_timeout": 10,
+                    "charset": "utf8mb4",
+                },
             })
         _engine = create_async_engine(url, **kwargs)
     return _engine
@@ -147,6 +151,31 @@ async def init_db(database_url: str | None = None) -> None:
                         logger.info("Migration: %s.device_id added", table)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Migration %s.device_id skipped: %s", table, exc)
+
+        # ── 1c. utf8mb4 迁移（MySQL 专属）：emoji 支持 ────────
+        # 现象：messages.content 写 4 字节 emoji（如 😊）报
+        # (1366, "Incorrect string value") → 客服偶发 500（DataError）
+        # 修复：表/列字符集 utf8mb3 → utf8mb4（幂等，重复执行无副作用）
+        if not is_sqlite:
+            for table in (
+                "messages",
+                "sessions",
+                "logs",
+                "bad_cases",
+                "practice_session_records",
+                "practice_running_sessions",
+                "users",
+            ):
+                try:
+                    await conn.execute(
+                        text(
+                            f"ALTER TABLE {table} CONVERT TO CHARACTER SET "
+                            "utf8mb4 COLLATE utf8mb4_unicode_ci"
+                        )
+                    )
+                    logger.info("Migration: %s → utf8mb4", table)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Migration %s utf8mb4 skipped: %s", table, exc)
 
         # ── 2. FTS5 virtual table（仅 SQLite）───────────────
         # MySQL/CloudBase 云数据库无 FTS5：跳过，检索走 FAISS 向量 + Python 关键词。
