@@ -292,7 +292,7 @@ async def chat(
         # Re-raise FastAPI HTTP exceptions as-is
         raise
     except Exception as exc:
-        # Catch-all: never leak internal details
+        # Catch-all: 记录错误类型到日志与响应（不泄露堆栈），便于线上定位
         log_node(
             trace_id=trace_id,
             node="chat_pipeline",
@@ -300,7 +300,7 @@ async def chat(
                 "session_id": request.session_id,
                 "message_preview": request.message[:100],
             },
-            output_data={"error": type(exc).__name__},
+            output_data={"error": f"{type(exc).__name__}: {exc}"},
             duration_ms=0,
             service="chat",
             status="error",
@@ -310,5 +310,5 @@ async def chat(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
+            detail=f"Internal Server Error ({type(exc).__name__})",
         )

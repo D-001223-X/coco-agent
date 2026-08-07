@@ -103,7 +103,11 @@ async def chat(req: ChatRequest, db: DbDep):
 @router.post("/session/end")
 async def end_session(req: EndSessionRequest, db: DbDep):
     """结束会话并持久化记录。"""
-    session = await _session_service.end_session_async(req.sessionId, db=db)
+    try:
+        session = await _session_service.end_session_async(req.sessionId, db=db)
+    except Exception as exc:  # noqa: BLE001
+        # 诊断：透传异常类型便于线上定位（不泄露堆栈）
+        raise HTTPException(status_code=500, detail=f"end failed ({type(exc).__name__}: {exc})") from exc
     return {
         "code": 0,
         "data": {"sessionId": req.sessionId, "ended": session is not None},
@@ -122,6 +126,9 @@ async def switch_scenario(req: SwitchScenarioRequest, db: DbDep):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        # 诊断：透传异常类型便于线上定位（不泄露堆栈）
+        raise HTTPException(status_code=500, detail=f"switch failed ({type(exc).__name__}: {exc})") from exc
 
     return {
         "code": 0,
