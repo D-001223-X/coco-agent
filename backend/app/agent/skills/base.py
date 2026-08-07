@@ -150,24 +150,71 @@ class BaseSkill(ABC):
 
     @staticmethod
     def parse_reply(raw: str) -> dict[str, Any]:
-        """解析 LLM 输出：第一行为回复，第二行（可选）为纠错 JSON。
+        """解析 LLM 输出：第一行为回复，后续可选 CORRECTION / THINK 行。
 
         Returns
         -------
         dict
-            ``{"reply": str, "correction": dict|None}``
+            ``{"reply": str, "correction": dict|None, "steps": list|None}``
+            steps: 真实 ReAct 思考链（多步 thought/tool/observation），
+            由 LLM 当次生成；缺失时回退模板（build_react_loop 兜底）。
         """
         lines = [ln.strip() for ln in (raw or "").split("\n") if ln.strip()]
         reply = lines[0] if lines else ""
         correction = None
+        steps: list[dict[str, Any]] | None = None
         for ln in lines[1:]:
             if ln.startswith("CORRECTION:"):
                 try:
                     correction = json.loads(ln[len("CORRECTION:"):].strip())
                 except json.JSONDecodeError:
                     correction = None
-                break
-        return {"reply": reply, "correction": correction}
+            elif ln.startswith("THINK:"):
+                try:
+                    raw_steps = json.loads(ln[len("THINK:"):].strip())
+                    if isinstance(raw_steps, list) and raw_steps:
+                        steps = [
+                            {
+                                "thought": str(s.get("thought", "")),
+                                "tool": str(s.get("tool", "")),
+                                "observation": str(s.get("observation", "")),
+                            }
+                            for s in raw_steps[:4]
+                            if isinstance(s, dict)
+                        ]
+                        if not steps:
+                            steps = None
+                except json.JSONDecodeError:
+                    steps = None
+        return {"reply": reply, "correction": correction, "steps": steps}
+
+    @staticmethod
+    def summarize_thoughts(
+        react_loop: list[dict[str, Any]],
+        fallback: str = "",
+    ) -> str:
+        """从 ReAct 步骤生成文本摘要（Agent 思考折叠内容）。
+
+        真实步骤：拼接 thought / tool(action) / observation；
+        空链回退 *fallback*。
+        """
+        if not react_loop:
+            return fallback
+        parts: list[str] = []
+        for i, s in enumerate(react_loop, 1):
+            seg: list[str] = []
+            thought = str(s.get("thought", "")).strip()
+            tool = str(s.get("action", "")).strip()
+            obs = str(s.get("observation", "")).strip()
+            if thought:
+                seg.append(thought)
+            if tool:
+                seg.append(f"工具：{tool}")
+            if obs:
+                seg.append(f"观察：{obs}")
+            if seg:
+                parts.append(f"{i}. {'；'.join(seg)}")
+        return "\n".join(parts) if parts else fallback
 
     @staticmethod
     def validate_correction(
@@ -197,11 +244,33 @@ class BaseSkill(ABC):
         reply: str,
         correction: dict | None,
         agent_thought: str,
+        trace_steps: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """构造 ReAct 循环步骤（Thought → Action → Observation）。
 
-        每个 Skill 处理后生成完整的推理轨迹，供前端展示与复制。
+        优先使用 LLM 当次生成的 ``trace_steps``（真实思考链：
+        thought=思考内容 / tool=用的工具 / observation=观察结果）；
+        缺失时回退到模板步骤（兼容旧输出）。
+
+        Returns
+        -------
+        list[dict]
+            步骤列表（step/thought/action/action_input/observation）
         """
+        # 真实思考链（LLM 当次输出）：thought/tool/observation 原样保留
+        if trace_steps:
+            return [
+                {
+                    "step": i + 1,
+                    "thought": s.get("thought", ""),
+                    "action": s.get("tool", ""),
+                    "action_input": {"text": user_message},
+                    "observation": s.get("observation", ""),
+                }
+                for i, s in enumerate(trace_steps)
+            ]
+
+        # ── 模板兜底（LLM 未输出 THINK 时）──────────────────
         steps: list[dict[str, Any]] = []
 
         # Step 1: 理解用户输入

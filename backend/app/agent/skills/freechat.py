@@ -44,7 +44,11 @@ FREECHAT_SYSTEM_PROMPT = """\
 ## 输出格式
 第一行：你的对话回复（1-2句）
 第二行（如有纠错）：CORRECTION: {{"original": "原句", "corrected": "正确表达", "type": "grammar|vocabulary|pronunciation"}}
-如果没有纠错，只输出第一行。
+第三行：THINK: [{{"thought": "本次具体的思考内容", "tool": "使用的分析工具", "observation": "具体观察结果"}}]
+- THINK 必须输出 2-3 步真实思考链（理解→分析→决策），内容基于当次对话，禁止套用固定模板
+- tool 从以下选择并如实填写：语法检查 / 表达优化 / 场景知识 / 话题引导 / 角色带入
+- observation 写具体观察（如"用户 'goed' 应为 'went'，过去式不规则变化错误"）
+- 如果没有纠错，省略 CORRECTION 行；THINK 行始终输出
 
 ## 对话历史
 {history}
@@ -110,11 +114,14 @@ class FreeChatSkill(BaseSkill):
             "自然引导话题并轻量纠错"
         )
 
+        # 真实思考链（LLM 当次 THINK 输出；缺失时 build_react_loop 模板兜底）
+        react_loop = self.build_react_loop(
+            user_message, reply, correction, agent_thought,
+            trace_steps=parsed.get("steps"),
+        )
         return {
             "reply": reply,
             "correction": correction,
-            "agentThought": agent_thought,
-            "react_loop": self.build_react_loop(
-                user_message, reply, correction, agent_thought
-            ),
+            "agentThought": self.summarize_thoughts(react_loop, agent_thought),
+            "react_loop": react_loop,
         }
