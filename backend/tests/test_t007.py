@@ -177,7 +177,7 @@ async def test_chat_service_error_returns_500(client, auth_context):
 
     assert resp.status_code == 500
     data = resp.json()
-    # Must not leak internal details
+    # 诊断模式（线上定位 500 根因，5553a07）：响应带异常类型名；
+    # 定位完成后恢复为隐藏 detail "Internal Server Error"
     assert "Unexpected DB failure" not in resp.text
-    assert "RuntimeError" not in resp.text
-    assert data.get("detail") == "Internal Server Error"
+    assert "RuntimeError" in data.get("detail", "")
