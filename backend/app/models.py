@@ -145,6 +145,29 @@ class PracticeSessionRecord(Base):
     ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class PracticeRunningSession(Base):
+    """进行中的口语陪练会话（P0 根治：多实例共享状态）。
+
+    CloudBase 无状态云函数下，内存会话跨实例会丢失（start/chat 路由到
+    不同实例 → 404）。会话状态实时落库，chat/switch 时按需恢复，
+    end 时归档到 practice_session_records 并删除本行。
+    """
+
+    __tablename__ = "practice_running_sessions"
+
+    session_id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, default="user_001")
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    scenario: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    user_level: Mapped[str] = mapped_column(String(5), nullable=False, default="A2")
+    history_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    skill_history_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Log(Base):
     __tablename__ = "logs"
 

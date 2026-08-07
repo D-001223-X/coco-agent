@@ -1,6 +1,11 @@
 """陪练会话业务逻辑（T-004）。
 
 管理 Skill 实例、会话状态与 Agent 决策集成。
+
+P0 根治（2026-08-07）：会话状态实时持久化到 ``practice_running_sessions`` 表。
+CloudBase 无状态云函数多实例下，纯内存会话会跨实例丢失（start/chat 路由到
+不同实例 → 404）。改造后：start 落库、chat/switch 按需从 DB 恢复并更新、
+end 归档到 ``practice_session_records`` 并删除 running 行。
 """
 
 from __future__ import annotations
@@ -54,17 +59,17 @@ class PracticeSession:
 
 
 class SessionService:
-    """会话管理：创建、对话、结束。内存存储（生产可换 Redis/DB）。"""
+    """会话管理：创建、对话、结束（内存缓存 + DB 持久化，多实例可靠）。"""
 
     def __init__(self) -> None:
         self._sessions: dict[str, PracticeSession] = {}
         self._decision_maker = DecisionMaker()
 
     # ── 生命周期 ─────────────────────────────────────────
-    def start_session(
-        self, mode: str, scenario: str, user_level: str, user_id: str
+    async def start_session(
+        self, mode: str, scenario: str, user_level: str, user_id: str, db: Any = None
     ) -> tuple[PracticeSession, str]:
-        """创建会话，返回 (session, greeting)。"""
+        """创建会话，返回 (session, greeting)。落库保证多实例可见。"""
         scenario = scenario or get_default_scenario(mode)
         skill = load_skill(mode, user_level, scenario)
         greeting = skill.get_greeting()
@@ -87,10 +92,22 @@ class SessionService:
             "timestamp": _now_iso(),
         })
         self._sessions[session_id] = session
+        if db is not None:
+            await self._save_running_async(session, db)
         return session, greeting
 
-    def get_session(self, session_id: str) -> PracticeSession | None:
-        return self._sessions.get(session_id)
+    async def get_session(
+        self, session_id: str, db: Any = None
+    ) -> PracticeSession | None:
+        """内存优先；miss 且提供 db 时从 running 表恢复（多实例兜底）。"""
+        session = self._sessions.get(session_id)
+        if session is not None:
+            return session
+        if db is not None:
+            session = await self._load_running_async(session_id, db)
+            if session is not None:
+                self._sessions[session_id] = session  # 放回本实例缓存
+        return session
 
     def end_session(self, session_id: str) -> PracticeSession | None:
         session = self._sessions.pop(session_id, None)
@@ -105,10 +122,13 @@ class SessionService:
     ) -> PracticeSession | None:
         """结束会话并持久化（异步版本，支持传入 AsyncSession）。"""
         session = self._sessions.pop(session_id, None)
+        if session is None and db is not None:
+            session = await self._load_running_async(session_id, db)
         if session is not None:
             session.ended_at = time.time()
             if db is not None:
                 await self._persist_session_async(session, db)
+                await self._delete_running_async(session_id, db)
         return session
 
     def _persist_session(self, session: PracticeSession) -> None:
@@ -152,8 +172,101 @@ class SessionService:
             ))
         await db.commit()
 
-    def switch_scenario(
-        self, session_id: str, scenario: str
+    # ── running 表持久化（P0 根治）────────────────────────
+    @staticmethod
+    async def _save_running_async(session: PracticeSession, db) -> None:
+        """保存/更新进行中会话状态。"""
+        from datetime import datetime, timezone
+
+        from sqlalchemy import select
+
+        from app.models import PracticeRunningSession
+
+        row = await db.execute(
+            select(PracticeRunningSession).where(
+                PracticeRunningSession.session_id == session.session_id
+            )
+        )
+        existing = row.scalar_one_or_none()
+        if existing is None:
+            db.add(PracticeRunningSession(
+                session_id=session.session_id,
+                user_id=session.user_id,
+                mode=session.mode,
+                scenario=session.scenario,
+                user_level=session.user_level,
+                history_json=json.dumps(session.history, ensure_ascii=False),
+                skill_history_json=json.dumps(
+                    session.skill.conversation_history, ensure_ascii=False
+                ),
+                started_at=datetime.fromtimestamp(
+                    session.started_at, tz=timezone.utc
+                ),
+            ))
+        else:
+            existing.scenario = session.scenario
+            existing.history_json = json.dumps(session.history, ensure_ascii=False)
+            existing.skill_history_json = json.dumps(
+                session.skill.conversation_history, ensure_ascii=False
+            )
+        await db.commit()
+
+    @staticmethod
+    async def _load_running_async(
+        session_id: str, db
+    ) -> PracticeSession | None:
+        """从 running 表恢复会话（重建 skill 并恢复对话历史）。"""
+        from datetime import timezone
+
+        from sqlalchemy import select
+
+        from app.models import PracticeRunningSession
+
+        row = await db.execute(
+            select(PracticeRunningSession).where(
+                PracticeRunningSession.session_id == session_id
+            )
+        )
+        rec = row.scalar_one_or_none()
+        if rec is None:
+            return None
+        try:
+            skill = load_skill(rec.mode, rec.user_level, rec.scenario)
+            skill.conversation_history = json.loads(rec.skill_history_json or "[]")
+            session = PracticeSession(
+                session_id=rec.session_id,
+                mode=rec.mode,
+                scenario=rec.scenario,
+                user_level=rec.user_level,
+                user_id=rec.user_id,
+                skill=skill,
+            )
+            session.history = json.loads(rec.history_json or "[]")
+            session.started_at = rec.started_at.replace(
+                tzinfo=timezone.utc
+            ).timestamp()
+            return session
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "恢复会话 %s 失败: %s（忽略，视为会话不存在）", session_id, exc
+            )
+            return None
+
+    @staticmethod
+    async def _delete_running_async(session_id: str, db) -> None:
+        from sqlalchemy import delete
+
+        from app.models import PracticeRunningSession
+
+        await db.execute(
+            delete(PracticeRunningSession).where(
+                PracticeRunningSession.session_id == session_id
+            )
+        )
+        await db.commit()
+
+    async def switch_scenario(
+        self, session_id: str, scenario: str, db: Any = None
     ) -> tuple[PracticeSession, str]:
         """切换会话的场景/话题，保留对话历史（T-005）。
 
@@ -161,7 +274,7 @@ class SessionService:
         -------
         (session, new_greeting)
         """
-        session = self.get_session(session_id)
+        session = await self.get_session(session_id, db)
         if session is None:
             raise KeyError(f"会话不存在: {session_id}")
 
@@ -179,16 +292,18 @@ class SessionService:
             "agentThought": "场景/话题动态切换，历史上下文已保留",
             "timestamp": _now_iso(),
         })
+        if db is not None:
+            await self._save_running_async(session, db)
         return session, new_greeting
 
     # ── 对话 ─────────────────────────────────────────────
-    async def chat(self, session_id: str, message: str) -> dict[str, Any]:
-        """处理用户消息，返回 Agent 回复 + 纠错 + 决策轨迹。"""
+    async def chat(self, session_id: str, message: str, db: Any = None) -> dict[str, Any]:
+        """处理用户消息，返回 Agent 回复 + 纠错 + 决策轨迹。每轮落库。"""
         import time as _time
 
         from app.utils.logger import log_node
 
-        session = self.get_session(session_id)
+        session = await self.get_session(session_id, db)
         if session is None:
             raise KeyError(f"会话不存在: {session_id}")
 
@@ -265,6 +380,10 @@ class SessionService:
             "timestamp": _now_iso(),
         })
         session.skill.append_history("agent", reply)
+
+        # P0 根治：每轮落库（多实例下其他实例可恢复）
+        if db is not None:
+            await self._save_running_async(session, db)
 
         return {
             "reply": reply,

@@ -57,14 +57,15 @@ async def get_modes():
 
 
 @router.post("/session/start")
-async def start_session(req: StartSessionRequest):
-    """开始新的陪练会话。"""
+async def start_session(req: StartSessionRequest, db: DbDep):
+    """开始新的陪练会话（P0：落库保证多实例可见）。"""
     try:
-        session, greeting = _session_service.start_session(
+        session, greeting = await _session_service.start_session(
             mode=req.mode,
             scenario=req.scenario,
             user_level=req.userLevel,
             user_id=req.userId,
+            db=db,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -77,10 +78,10 @@ async def start_session(req: StartSessionRequest):
 
 
 @router.post("/session/chat")
-async def chat(req: ChatRequest):
-    """处理用户消息。"""
+async def chat(req: ChatRequest, db: DbDep):
+    """处理用户消息（P0：每轮落库，跨实例可恢复）。"""
     try:
-        result = await _session_service.chat(req.sessionId, req.message)
+        result = await _session_service.chat(req.sessionId, req.message, db=db)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -111,11 +112,11 @@ async def end_session(req: EndSessionRequest, db: DbDep):
 
 
 @router.post("/session/switch")
-async def switch_scenario(req: SwitchScenarioRequest):
+async def switch_scenario(req: SwitchScenarioRequest, db: DbDep):
     """切换会话的场景/话题（保留历史上下文，T-005）。"""
     try:
-        session, new_greeting = _session_service.switch_scenario(
-            req.sessionId, req.scenario
+        session, new_greeting = await _session_service.switch_scenario(
+            req.sessionId, req.scenario, db=db
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
