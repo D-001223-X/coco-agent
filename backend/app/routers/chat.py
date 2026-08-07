@@ -310,5 +310,5 @@ async def chat(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error ({type(exc).__name__})",
+            detail=f"Internal Server Error ({type(exc).__name__}: {str(exc)[:200]})",
         )
