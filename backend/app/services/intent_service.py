@@ -12,6 +12,7 @@ Architecture:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -297,16 +298,25 @@ class IntentService:
 
         url = f"{s.deepseek_base_url}/chat/completions"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+        # 失败重试 1 次（限流/网络抖动/5xx 时降低降级率）
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
 
-        # Extract the assistant's text
-        choices = data.get("choices", [])
-        if not choices:
-            raise ValueError("DeepSeek returned no choices")
-        return choices[0]["message"]["content"]
+                # Extract the assistant's text
+                choices = data.get("choices", [])
+                if not choices:
+                    raise ValueError("DeepSeek returned no choices")
+                return choices[0]["message"]["content"]
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt == 0:
+                    await asyncio.sleep(0.5)
+        raise last_exc  # type: ignore[misc]
 
     # ── Response parser ────────────────────────────────────
     @staticmethod
@@ -339,7 +349,23 @@ class IntentService:
         try:
             data = json.loads(text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Failed to parse model response as JSON: {exc}") from exc
+            # 兜底：正则提取 intent（v4-flash 偶发输出非纯 JSON 时）
+            # 降低降级率：至少能识别意图，resolved_question 用原文
+            import re as _re
+
+            m = _re.search(r'"intent"\s*:\s*"(SUPPORT|FEEDBACK|CHAT)"', text, _re.I)
+            if m:
+                data = {
+                    "intent": m.group(1).upper(),
+                    "confidence": 0.0,
+                    "resolved_question": original_query,
+                    "reason": f"Fuzzy parse: {exc}",
+                    "related_sections": [],
+                }
+            else:
+                raise ValueError(
+                    f"Failed to parse model response as JSON: {exc}"
+                ) from exc
 
         intent = data.get("intent", INTENT_CHAT).upper()
         if intent not in _VALID_INTENTS:
