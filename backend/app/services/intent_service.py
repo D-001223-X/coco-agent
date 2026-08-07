@@ -311,7 +311,11 @@ class IntentService:
                 choices = data.get("choices", [])
                 if not choices:
                     raise ValueError("DeepSeek returned no choices")
-                return choices[0]["message"]["content"]
+                content = choices[0]["message"]["content"]
+                # 空内容（v4-flash 偶发返回空串）视为失败 → 触发重试
+                if not content or not str(content).strip():
+                    raise ValueError("DeepSeek returned empty content")
+                return content
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 if attempt == 0:
